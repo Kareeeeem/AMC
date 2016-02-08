@@ -1,15 +1,25 @@
 import datetime
-import uuid
 
 import bcrypt
-from itsdangerous import TimedJSONWebSignatureSerializer as Serializer, \
-    SignatureExpired, BadSignature
-from sqlalchemy import Column, DateTime, String
-from sqlalchemy.dialects.postgresql import UUID
+from itsdangerous import (
+    TimedJSONWebSignatureSerializer as Serializer,
+    SignatureExpired,
+    BadSignature,
+)
+from sqlalchemy import (
+    Column,
+    Integer,
+    DateTime,
+    String,
+    Text,
+    ForeignKey,
+    Sequence,
+)
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
+from sqlalchemy.orm import relationship
 from werkzeug.security import safe_str_cmp
 
-ID_TYPE = UUID
+ID_TYPE = Integer
 
 
 class BaseModel(object):
@@ -18,20 +28,26 @@ class BaseModel(object):
         '''Set the table name to the lowercase version of the class name'''
         return cls.__name__.lower()
 
-    id = Column(ID_TYPE, default=lambda: str(uuid.uuid4()), primary_key=True)
+    # Using a global sequence for primary key generation to get unique
+    # public ids for every row, regardless of the strategy for public ids.
+    id = Column(ID_TYPE, Sequence('global_id_seq'), primary_key=True)
     created = Column(DateTime, default=datetime.datetime.utcnow)
     modified = Column(DateTime, default=datetime.datetime.utcnow,
                       onupdate=datetime.datetime.utcnow)
+
 
 Base = declarative_base(cls=BaseModel)
 
 
 class User(Base):
-    name = Column(String, unique=True, nullable=False)
+    username = Column(String, unique=True, nullable=False)
+    email = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
 
-    def __init__(self, rounds=12, *args, **kwargs):
-        self.rounds = rounds
+    exercises = relationship('Exercise', backref='author')
+
+    def __init__(self, *args, **kwargs):
+        self.rounds = kwargs.pop('bcrypt_rounds', 12)
         return super(User, self).__init__(*args, **kwargs)
 
     @property
@@ -72,3 +88,9 @@ class User(Base):
             return None
         user = session.query(cls).get(data['id'])
         return user
+
+
+class Exercise(Base):
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    author_id = Column(ID_TYPE, ForeignKey('user.id'), nullable=False)

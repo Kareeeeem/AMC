@@ -1,35 +1,40 @@
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
-
-from app import models
-from config import config as configurations
-
-Session = sessionmaker()
-
-
-@pytest.yield_fixture(scope='session')
-def config(request):
-    config = configurations['testing']
-    yield config
+from app import (
+    create_app,
+    models,
+    db,
+)
 
 
 @pytest.yield_fixture(scope='session')
-def engine(config, request):
-    config = configurations['testing']
-    engine = create_engine(config.DATABASE_URI, convert_unicode=True)
-    models.Base.metadata.create_all(engine)
-    yield engine
-    models.Base.metadata.drop_all(engine)
+def app(request):
+    app = create_app('testing')
+    ctx = app.app_context()
+    ctx.push()
+    yield app
+    ctx.pop()
+
+
+@pytest.yield_fixture(scope='session')
+def connection(app, request):
+    models.Base.metadata.create_all(db.engine)
+    connection = db.engine.connect()
+    yield connection
+    connection.close()
+    models.Base.metadata.drop_all(db.engine)
 
 
 @pytest.yield_fixture(scope='function')
-def session(engine, request):
-    connection = engine.connect()
+def session(connection, request):
     transaction = connection.begin()
+
+    # get at the session factory to create a new non-scoped session
+    # bound to the connection.
+    Session = db.session.session_factory
     session = Session(bind=connection)
+
     yield session
+
     session.close()
     transaction.rollback()
-    connection.close()

@@ -11,12 +11,13 @@ class Config(object):
     TESTING = False
     LOGGING_LEVEL = 'DEBUG'
     BASEDIR = basedir
+    INTENCODER_BITS = 32
 
     @staticmethod
     def add_loghandler(logger, loglevel, logfile):
         logger.setLevel(getattr(logging, loglevel, 'DEBUG'))
         log_handler = handlers.RotatingFileHandler(logfile,
-                                                   maxBytes=5*1024*1024,
+                                                   maxBytes=5 * 1024 * 1024,
                                                    backupCount=2)
         log_handler.setFormatter(logging.Formatter(
             '%(asctime)s %(levelname)s: %(message)s '
@@ -39,9 +40,11 @@ class Config(object):
 class DevelopmentConfig(Config):
     DEBUG = True
     SECRET_KEY = 'seekrit'
-    DATABASE_URI = os.environ.get('DEV_DATABASE_URI')
-    SQLALCHEMY_ECHO = False
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URI')
+    SQLALCHEMY_ECHO = True
     BCRYPT_ROUNDS = 4
+    INTENCODER_COPRIME = 4286190277
+    INTENCODER_SALT = 'SaAaAalTy'
 
 
 class TestingConfig(DevelopmentConfig):
@@ -54,7 +57,7 @@ class TestingConfig(DevelopmentConfig):
 class ProductionConfig(Config):
     LOGGING_LEVEL = 'WARNING'
     SECRET_KEY = os.environ.get('SECRET_KEY')
-    DATABASE_URI = os.environ.get('PROD_DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('PROD_DATABASE_URL')
 
 
 config = {

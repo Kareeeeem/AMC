@@ -13,18 +13,13 @@ setup(
     author='Mohammed Kareem',
     author_email='kareeeeem@gmail.com',
     license='MIT',
-    packages=find_packages(),
+    # packages=find_packages(),
+    packages=['app', 'scripts', 'tests'],
     install_requires=[
-        'click==6.2',
-        'Flask==0.10.1',
-        'marshmallow==2.5.0',
-        'SQLAlchemy==1.0.11',
-        'bcrypt==2.0.0',
-        'psycopg2==2.6.1',
     ],
     entry_points="""
         [console_scripts]
-        db=scripts.db:cli
+        app=scripts.cli:cli
     """,
     include_package_data=True,
     zip_safe=False,
