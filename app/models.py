@@ -9,6 +9,8 @@ from sqlalchemy import (
     ForeignKey,
     Sequence,
 )
+from sqlalchemy.dialects.postgresql import HSTORE
+from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm import relationship
 
@@ -62,4 +64,11 @@ class User(Base, SecurityMixin):
 class Exercise(Base):
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
-    author_id = Column(ID_TYPE, ForeignKey('user.id'), nullable=False)
+    author_id = Column(ID_TYPE, ForeignKey('user.id',
+                                           ondelete="SET NULL",
+                                           onupdate="CASCAdE"))
+
+
+class Token(Base):
+    type = Column(String, unique=True, nullable=False)
+    tokens = Column(MutableDict.as_mutable(HSTORE))
