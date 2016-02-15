@@ -1,6 +1,6 @@
 import pytest  # noqa
 
-from app.helpers import IntEncoder
+from app.lib import IntEncoder
 
 
 dummy_ids = [

@@ -1,46 +1,30 @@
-from flask import Flask, url_for
+from flask import Flask
 
 from config import config
-from app import models, helpers
+from app import lib
 
-db = helpers.Database()
-id_obfuscator = helpers.FlaskIntEncoder()
+
+db = lib.Database()
+hashid = lib.FlaskIntEncoder()
+auth = lib.Auth()
 
 
 def create_app(config_name):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+    app.response_class = lib.HandleJSONReponse
+
     config[config_name].init_loggers(app)
-    app.response_class = helpers.HandleJSONReponse
 
     db.init_app(app)
-    id_obfuscator.init_app(app)
+    hashid.init_app(app)
+    app.url_map.converters['id'] = hashid.id_converter
 
-    app.url_map.converters['id'] = id_obfuscator.id_converter
-
-    @app.route('/')
-    def index():
-        users = db.session.query(models.User).all()
-        link = '<div><a href="{}">{}</a></div>'
-        # rv = ''.join([link.format(url_for('user', id=user.id), user.username)
-        #               for user in users])
-        rv = ''.join([link.format(url_for('user', id=user.id), user.username)
-                      for user in users])
-        return rv
-
-    @app.route('/<id:id>')
-    def user(id):
-        return str(id)
+    from app.api.v1 import auth
+    app.register_blueprint(auth.bp)
 
     @app.teardown_appcontext
     def shutdown_session(exc=None):
         db.session.remove()
-
-    @app.shell_context_processor
-    def make_shellcontext():
-        ctx = {'db': db}
-        for subclass in models.Base.__subclasses__():
-            ctx[subclass.__name__] = subclass
-        return ctx
 
     return app

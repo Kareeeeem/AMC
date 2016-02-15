@@ -28,13 +28,19 @@ def connection(app, request):
 @pytest.yield_fixture(scope='function')
 def session(connection, request):
     transaction = connection.begin()
-
-    # get at the session factory to create a new non-scoped session
-    # bound to the connection.
-    Session = db.session.session_factory
-    session = Session(bind=connection)
-
-    yield session
-
-    session.close()
+    db.session.configure(bind=connection)
+    yield db.session
+    db.session.remove()
     transaction.rollback()
+
+
+@pytest.yield_fixture(scope='function')
+def user(session):
+    user = models.User(
+        username='Kareem',
+        password='0000',
+        email='kareem@gmail.com',
+    )
+    session.add(user)
+    session.commit()
+    yield user

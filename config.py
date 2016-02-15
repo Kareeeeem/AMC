@@ -40,8 +40,9 @@ class Config(object):
 class DevelopmentConfig(Config):
     DEBUG = True
     SECRET_KEY = 'seekrit'
+    TOKEN_EXPIRATION = 3600
     SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URI')
-    SQLALCHEMY_ECHO = True
+    SQLALCHEMY_ECHO = False
     BCRYPT_ROUNDS = 4
     INTENCODER_COPRIME = 4286190277
     INTENCODER_SALT = 'SaAaAalTy'
@@ -51,7 +52,8 @@ class TestingConfig(DevelopmentConfig):
     TESTING = True
     SECRET_KEY = 'seekrit'
     BCRYPT_ROUNDS = 4
-    DATABASE_URI = os.environ.get('TEST_DATABASE_URI')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URI')
+    TOKEN_EXPIRATION = 1
 
 
 class ProductionConfig(Config):

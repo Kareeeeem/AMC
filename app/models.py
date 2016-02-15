@@ -1,11 +1,5 @@
 import datetime
 
-import bcrypt
-from itsdangerous import (
-    TimedJSONWebSignatureSerializer as Serializer,
-    SignatureExpired,
-    BadSignature,
-)
 from sqlalchemy import (
     Column,
     Integer,
@@ -17,7 +11,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm import relationship
-from werkzeug.security import safe_str_cmp
+
+from app import hashid
+from app.lib import SecurityMixin
 
 ID_TYPE = Integer
 
@@ -39,55 +35,28 @@ class BaseModel(object):
 Base = declarative_base(cls=BaseModel)
 
 
-class User(Base):
+class User(Base, SecurityMixin):
     username = Column(String, unique=True, nullable=False)
     email = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
 
     exercises = relationship('Exercise', backref='author')
 
-    def __init__(self, *args, **kwargs):
-        self.rounds = kwargs.pop('bcrypt_rounds', 12)
-        return super(User, self).__init__(*args, **kwargs)
-
-    @property
-    def password(self):
-        raise AttributeError('Password is not a readable attribute.')
-
-    @password.setter
-    def password(self, password):
-        if isinstance(password, unicode):
-            password = str(password.encode('u8'))
-
-        self.password_hash = bcrypt.hashpw(password, bcrypt.gensalt(self.rounds))
-
-    def verify_password(self, password):
-        '''Hash the given password and verify it with self.password_hash
-        :param str password: the given password.
+    def generate_auth_token(self, expiration=None, **kwargs):
+        '''Generate an auth token with the hashed id as the payload.
         '''
-        password_hash = self.password_hash
-
-        if isinstance(password, unicode):
-            password = password.encode('u8')
-        if isinstance(self.password_hash, unicode):
-            password_hash = self.password_hash.encode('u8')
-
-        return safe_str_cmp(bcrypt.hashpw(password, password_hash),
-                            password_hash)
-
-    def generate_auth_token(self, secret_key, expiration=3600):
-        s = Serializer(secret_key, expires_in=expiration)
-        return s.dumps({'id': self.id})
+        payload = dict(id=hashid.encode(self.id), **kwargs)
+        return super(User, self).generate_auth_token(expiration=expiration, **payload)
 
     @classmethod
-    def verify_auth_token(cls, session, secret_key, token):
-        s = Serializer(secret_key)
-        try:
-            data = s.loads(token)
-        except (SignatureExpired, BadSignature):
-            return None
-        user = session.query(cls).get(data['id'])
-        return user
+    def verify_auth_token(cls, token):
+        '''Verify the auth token and return the claims with the decoded id if
+        valid and None if invalid.
+        '''
+        data = super(User, cls).verify_auth_token(token)
+        if data:
+            data.update(id=hashid.decode(data['id']))
+            return data
 
 
 class Exercise(Base):
