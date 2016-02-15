@@ -20,6 +20,19 @@ def db(ctx):
 def create(obj):
     '''Create all database tables.'''
     obj['models'].Base.metadata.create_all(obj['db'].engine)
+    # session = obj['db'].session
+    # session.add(obj['models'].Token(type='revoked'))
+    # session.commit()
+
+
+@db.command()
+@click.pass_obj
+def user(obj):
+    User = obj['models'].User
+    db = obj['db']
+    u = User(username='kareem', email='kareeeeem@gmail.com', password='0000')
+    db.session.add(u)
+    db.session.commit()
 
 
 @db.command()
