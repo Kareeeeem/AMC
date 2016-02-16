@@ -67,8 +67,3 @@ class Exercise(Base):
     author_id = Column(ID_TYPE, ForeignKey('user.id',
                                            ondelete="SET NULL",
                                            onupdate="CASCAdE"))
-
-
-class Token(Base):
-    type = Column(String, unique=True, nullable=False)
-    tokens = Column(MutableDict.as_mutable(HSTORE))
