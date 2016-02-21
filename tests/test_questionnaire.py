@@ -1,4 +1,6 @@
 import random
+import functools
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql import func
 
@@ -6,14 +8,17 @@ import pytest  # noqa
 
 from app import models
 
+# generate answers to questionnaire
+values = [random.randrange(3) for i in range(10)]
 
-def generate_response(questionnaire):
+
+def generate_response(answers, questionnaire):
     choices = []
-    for question in questionnaire.questions:
-        x = random.randrange(len(question.answers))
-        choice = dict(question_id=question.id, value=question.answers[x].value)
-        choices.append(choice)
+    for i, question in enumerate(questionnaire.questions):
+        choices.append(dict(question_id=question.id, value=answers[i]))
     return dict(choices=choices)
+
+generate_response = functools.partial(generate_response, values)
 
 
 def test_no_two_answers_for_one_question(amisos, user, session):
