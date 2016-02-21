@@ -1,6 +1,6 @@
 *.swp
 *.py[cod]
-*.log
+*.log*
 *.egg-info
 *.egg
 venv/
