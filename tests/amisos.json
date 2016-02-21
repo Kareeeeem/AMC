@@ -1,0 +1,117 @@
+{
+    "title": "AMisoS",
+    "description": "Met deze vragenlijst krijgt u inzicht over uw huidige gesteldheid.",
+    "version": 1,
+    "questions": [
+        {
+            "text": "Hoeveel tijd bent u per dag kwijt aan (gedachten over) de geluiden?",
+            "ordinal": 0,
+            "answers": [
+                {"value": 0, "text": "0 uur"},
+                {"value": 1, "text": "< uur"},
+                {"value": 2, "text": "1-3 uur"},
+                {"value": 3, "text": "3-8 uur"},
+                {"value": 4, "text": "> 8 uur"}
+            ]
+        },
+        {
+            "text": "In welke mate bent u gefocust op de geluiden?",
+            "ordinal": 1,
+            "answers": [
+                {"value": 0, "text": "Niet"},
+                {"value": 1, "text": "Licht"},
+                {"value": 2, "text": "Matig"},
+                {"value": 3, "text": "Ernstig"},
+                {"value": 4, "text": "Extreem"}
+            ]
+        },
+        {
+            "text": "In welke mate ervaart u hinder bij het horen van de geluiden?",
+            "ordinal": 2,
+            "answers": [
+                {"value": 0, "text": "Niet"},
+                {"value": 1, "text": "Licht"},
+                {"value": 2, "text": "Matig"},
+                {"value": 3, "text": "Ernstig"},
+                {"value": 4, "text": "Extreem"}
+            ]
+        },
+        {
+            "text": "Hoe heftig is uw gevoel van irritatie/agressie bij het horen van de geluiden?",
+            "ordinal": 3,
+            "answers": [
+                {"value": 0, "text": "Niet"},
+                {"value": 1, "text": "Licht"},
+                {"value": 2, "text": "Matig"},
+                {"value": 3, "text": "Ernstig"},
+                {"value": 4, "text": "Extreem"}
+            ]
+        },
+        {
+            "text": "In welke mate voelt u zich machteloos door de geluiden?",
+            "ordinal": 4,
+            "answers": [
+                {"value": 0, "text": "Niet"},
+                {"value": 1, "text": "Licht"},
+                {"value": 2, "text": "Matig"},
+                {"value": 3, "text": "Ernstig"},
+                {"value": 4, "text": "Extreem"}
+            ]
+        },
+        {
+            "text": "In welke mate lijdt u onder de geluiden?",
+            "ordinal": 5,
+            "answers": [
+                {"value": 0, "text": "Niet"},
+                {"value": 1, "text": "Licht"},
+                {"value": 2, "text": "Matig"},
+                {"value": 3, "text": "Ernstig"},
+                {"value": 4, "text": "Extreem"}
+            ]
+        },
+        {
+            "text": "In welke mate lijdt u onder het vermijden van de geluiden?",
+            "ordinal": 6,
+            "answers": [
+                {"value": 0, "text": "Niet"},
+                {"value": 1, "text": "Licht"},
+                {"value": 2, "text": "Matig"},
+                {"value": 3, "text": "Ernstig"},
+                {"value": 4, "text": "Extreem"}
+            ]
+        },
+        {
+            "text": "In welke mate beperken de geluiden uw dagelijks leven (werk, huishouden, etc.)?",
+            "ordinal": 7,
+            "answers": [
+                {"value": 0, "text": "Niet"},
+                {"value": 1, "text": "Licht"},
+                {"value": 2, "text": "Matig"},
+                {"value": 3, "text": "Ernstig"},
+                {"value": 4, "text": "Extreem"}
+            ]
+        },
+        {
+            "text": "In welke mate gaat u bepaalde plekken of situaties uit de weg vanwege de geluiden?",
+            "ordinal": 8,
+            "answers": [
+                {"value": 0, "text": "Niet"},
+                {"value": 1, "text": "Licht"},
+                {"value": 2, "text": "Matig"},
+                {"value": 3, "text": "Ernstig"},
+                {"value": 4, "text": "Extreem"}
+            ]
+        },
+        {
+            "text": "In welke mate kunt u uw aandacht verleggen tijdens het horen van de geluiden?",
+            "ordinal": 9,
+            "answers": [
+                {"value": 0, "text": "Altijd"},
+                {"value": 1, "text": "Meestal (75%)"},
+                {"value": 2, "text": "Soms wel, soms niet (50%)"},
+                {"value": 3, "text": "Zelden (25%)"},
+                {"value": 4, "text": "Nooit"}
+            ]
+        }
+    ]
+}

@@ -1,3 +1,6 @@
+import json
+import os
+
 import pytest
 
 from app import (
@@ -44,3 +47,14 @@ def user(session):
     session.add(user)
     session.commit()
     yield user
+
+
+@pytest.yield_fixture(scope='function')
+def amisos(session):
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    with open(os.path.join(basedir, 'amisos.json')) as amisos_json:
+        data = json.load(amisos_json)
+        amisos = models.Questionnaire(**data)
+        session.add(amisos)
+    session.commit()
+    yield amisos

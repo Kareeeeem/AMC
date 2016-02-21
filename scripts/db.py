@@ -1,4 +1,6 @@
+# import sys
 import os
+import json
 
 import click
 from flask.cli import pass_script_info
@@ -7,42 +9,59 @@ from pgcli.main import PGCli
 from scripts.cli import cli
 
 
+def get_db_and_models():
+    from app import db, models
+    return db, models
+
+
 @cli.group(chain=True)
-@click.pass_context
-def db(ctx):
+def db():
     '''Database operations.'''
-    from app import models, db
-    ctx.obj = dict(models=models, db=db)
+
+
+@db.command()
+@click.pass_context
+def drop(ctx):
+    '''Drop all database tables.'''
+    db, models = get_db_and_models()
+    models.Base.metadata.drop_all(db.engine)
+    click.echo('Dropped all tables')
+
+
+@db.command()
+@click.option('-d', is_flag=True, default=False)
+@click.pass_context
+def create(ctx, d):
+    '''Optionally drop and create all database tables.'''
+    db, models = get_db_and_models()
+    if d:
+        ctx.invoke(drop)
+    models.Base.metadata.create_all(db.engine)
+    click.echo('Created all tables')
 
 
 @db.command()
 @click.pass_obj
-def create(obj):
-    '''Create all database tables.'''
-    obj['models'].Base.metadata.create_all(obj['db'].engine)
-    # session = obj['db'].session
-    # session.add(obj['models'].Token(type='revoked'))
-    # session.commit()
+def fill(obj):
+    db, models = get_db_and_models()
+    user = models.User(username='kareem',
+                       email='kareeeeem@gmail.com',
+                       password='0000')
+    db.session.add(user)
+    db.session.add(models.Exercise(title='first',
+                                   description='first desc',
+                                   author=user))
 
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    with open(os.path.join(basedir, 'amisos.json')) as amisos_json:
+        data = json.load(amisos_json)
+        amisos = models.Questionnaire(**data)
+        db.session.add(amisos)
 
-@db.command()
-@click.pass_obj
-def user(obj):
-    User = obj['models'].User
-    db = obj['db']
-    u = User(username='kareem', email='kareeeeem@gmail.com', password='0000')
-    db.session.add(u)
     db.session.commit()
 
 
 @db.command()
-@click.pass_obj
-def drop(obj):
-    '''Drop all database tables.'''
-    obj['models'].Base.metadata.drop_all(obj['db'].engine)
-
-
-@cli.command()
 @click.option('--pgclirc',
               default=os.path.expanduser('~/.config/pgcli/config'),
               envvar='PGCLIRC', help='Location of pgclirc file.')
