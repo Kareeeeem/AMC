@@ -11,10 +11,6 @@ bp = Blueprint('auth', __name__, url_prefix='/v1/auth')
 
 # TODO return usefull errors
 
-@bp.route('/test')
-def index():
-    return 'hello'
-
 
 @auth.verify_token
 def verify_token(token):
@@ -47,12 +43,11 @@ def login():
 
     username_or_email = form.get('username')
     password = form.get('password')
-    # ilike operator for case insensitive match
     user = db.session.query(models.User).filter(
         or_(models.User.username.ilike(username_or_email),
             models.User.email.ilike(username_or_email))).first()
 
-    if not user or not user.verify_password(password):
+    if not user or not user.password == password:
         abort(401)
 
     return user.generate_auth_token()

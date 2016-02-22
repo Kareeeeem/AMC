@@ -1,10 +1,14 @@
+'''This module contains plugins and helpers. With an emphasis on those that
+need the app's config values.
+'''
+
 import fractions
 import functools
 import random
 
+import bcrypt
 import hashids
 
-import bcrypt
 from flask import (
     _app_ctx_stack,
     Response,
@@ -14,12 +18,13 @@ from flask import (
     abort,
 )
 from itsdangerous import (
-    TimedJSONWebSignatureSerializer as Serializer,
-    SignatureExpired,
     BadSignature,
+    SignatureExpired,
+    TimedJSONWebSignatureSerializer as Serializer,
 )
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, Column, String
 from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.types import TypeDecorator
 from werkzeug.routing import BaseConverter
 from werkzeug.security import safe_str_cmp
 
@@ -165,36 +170,45 @@ class FlaskIntEncoder(IntEncoder):
         return UrlConvertor
 
 
-class SecurityMixin(object):
+class Password(str):
+    '''Subclass of string that implements string comparisons using Bcrypt.
+    '''
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            other = other.encode('utf-8')
+            other = bcrypt.hashpw(other, self)
+        return safe_str_cmp(self, other)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+class BcryptType(TypeDecorator):
+    '''Persist Bcrypt hashes.'''
+    impl = String(128)
+
     @property
-    def password(self):
-        raise AttributeError('Password is not a readable attribute')
+    def rounds(self):
+        return current_app.config.get('BCRYPT_ROUNDS', 12)
 
-    @password.setter
-    def password(self, password):
-        if isinstance(password, unicode):
-            password = str(password.encode('u8'))
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            value = value.encode('utf-8')
+            return bcrypt.hashpw(value, bcrypt.gensalt(self.rounds))
 
-        rounds = current_app.config.get('BCRYPT_ROUNDS', 13)
-        self.password_hash = bcrypt.hashpw(password, bcrypt.gensalt(rounds))
+    def process_result_value(self, value, dialect):
+        return Password(value)
 
-    def verify_password(self, password):
-        '''Hash the given password and verify it with self.password_hash
-        :param str password: the given password.
-        '''
-        if isinstance(password, unicode):
-            password = password.encode('u8')
 
-        if isinstance(self.password_hash, unicode):
-            password_hash = self.password_hash.encode('u8')
-
-            return safe_str_cmp(bcrypt.hashpw(password, password_hash),
-                                password_hash)
+class SecurityMixin(object):
+    password = Column(BcryptType, nullable=False)
 
     def generate_auth_token(self, expiration=None, **payload):
         secret_key = current_app.config['SECRET_KEY']
         expiration = expiration or current_app.config.get('TOKEN_EXPIRATION')
+
         s = Serializer(secret_key, expires_in=expiration)
+
         return dict(access_token=s.dumps(payload),
                     expires_in=expiration,
                     token_type='bearer')

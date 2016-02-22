@@ -21,10 +21,6 @@ from app.lib import SecurityMixin
 
 ID_TYPE = Integer
 
-GlobalId = lambda: Column(ID_TYPE, Sequence('global_id_seq'), primary_key=True)
-Created = lambda: Column(DateTime, default=datetime.datetime.utcnow)
-Modified = lambda: Column(DateTime, default=datetime.datetime.utcnow,
-                          onupdate=datetime.datetime.utcnow)
 
 # TODO extract making and filling in questionnaires with validation into it's own class
 # TODO figure out postgresql row_to_json function
@@ -36,22 +32,27 @@ class BaseModel(object):
         '''Set the table name to the lowercase version of the class name'''
         return cls.__name__.lower()
 
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow,
+                        onupdate=datetime.datetime.utcnow)
+
+
 Base = declarative_base(cls=BaseModel)
 
 
-class User(Base, SecurityMixin):
-    id = GlobalId()
-    created = Created()
-    modified = Modified()
+class GlobalID(object):
+    id = Column(ID_TYPE, Sequence('global_id_seq'), primary_key=True)
 
+
+class User(GlobalID, SecurityMixin, Base):
     username = Column(String, unique=True, nullable=False)
     email = Column(String, unique=True, nullable=False)
-    password_hash = Column(String, nullable=False)
 
     exercises = relationship(
         'Exercise',
         backref=backref('author', lazy='joined')
     )
+
     questionnaire_responses = relationship(
         'QuestionnaireResponse',
         cascade='all, delete-orphan',
@@ -75,11 +76,7 @@ class User(Base, SecurityMixin):
             return data
 
 
-class Questionnaire(Base):
-    id = GlobalId()
-    created = Created()
-    modified = Modified()
-
+class Questionnaire(GlobalID, Base):
     title = Column(String, nullable=False)
     description = Column(String, nullable=False)
     version = Column(Integer)
@@ -112,8 +109,7 @@ class Questionnaire(Base):
         return resp
 
 
-class Question(Base):
-    id = GlobalId()
+class Question(GlobalID, Base):
     text = Column(String, nullable=False)
     ordinal = Column(Integer)
 
@@ -169,11 +165,8 @@ class AnswerResponse(Base):
     )
 
 
-class QuestionnaireResponse(Base):
+class QuestionnaireResponse(GlobalID, Base):
     __tablename__ = 'questionnaire_response'
-
-    id = GlobalId()
-    created = Created()
 
     choices = relationship(
         'AnswerResponse',
@@ -186,6 +179,7 @@ class QuestionnaireResponse(Base):
         ForeignKey('user.id', ondelete='CASCADE'),
         nullable=False
     )
+
     questionnaire_id = Column(
         ID_TYPE,
         ForeignKey('questionnaire.id', ondelete='CASCADE'),
@@ -199,8 +193,7 @@ class QuestionnaireResponse(Base):
         self.choices = [AnswerResponse(**choice) for choice in choices]
 
 
-class Exercise(Base):
-    id = GlobalId()
+class Exercise(GlobalID, Base):
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     author_id = Column(ID_TYPE, ForeignKey('user.id'))
