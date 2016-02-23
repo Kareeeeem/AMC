@@ -192,11 +192,12 @@ class BcryptStr(str):
     '''Subclass of string that encrypts and implements string comparisons using
     Bcrypt.
     '''
-    def __new__(cls, value, salt=None, crypt=True):
+    def __new__(cls, value, salt=None, crypt=True, rounds=None):
         if isinstance(value, unicode):
             value = value.encode('utf-8')
         if crypt:
-            salt = salt or bcrypt.gensalt(cls.get_rounds())
+            if not salt:
+                salt = bcrypt.gensalt(rounds or cls.get_rounds())
             value = bcrypt.hashpw(value, salt)
         return str.__new__(cls, value)
 
