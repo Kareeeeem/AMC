@@ -5,7 +5,6 @@ from app import lib
 
 
 db = lib.Database()
-hashid = lib.FlaskIntEncoder()
 auth = lib.Auth()
 
 
@@ -16,8 +15,11 @@ def create_app(config_name):
 
     config[config_name].init_loggers(app)
 
+    app.url_map.converters['hashid'] = lib.HashIDConverter.with_salt(
+        app.config.get('HASHID_SALT', '')
+    )
+
     db.init_app(app)
-    hashid.init_app(app)
 
     from app.api.v1 import auth
     app.register_blueprint(auth.bp)

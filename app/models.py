@@ -3,6 +3,8 @@ import datetime
 from sqlalchemy import (
     Column,
     DateTime,
+    DDL,
+    event,
     ForeignKey,
     ForeignKeyConstraint,
     Integer,
@@ -11,11 +13,11 @@ from sqlalchemy import (
     Text,
     UniqueConstraint
 )
+from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship, backref
 
-from app import hashid
 from app.lib import SecurityMixin
 
 
@@ -24,6 +26,7 @@ ID_TYPE = Integer
 
 # TODO extract making and filling in questionnaires with validation into it's own class
 # TODO figure out postgresql row_to_json function
+# TODO customize id_function
 
 
 class BaseModel(object):
@@ -39,12 +42,42 @@ class BaseModel(object):
 
 Base = declarative_base(cls=BaseModel)
 
+global_id_seq = Sequence('global_id_seq', metadata=Base.metadata)
+id_function_name = 'obscure_id'
+create_id_function = '''
+CREATE OR REPLACE FUNCTION {}() returns int AS $$
+DECLARE
+l1 int;
+l2 int;
+r1 int;
+r2 int;
+value bigint;
+i int:=0;
+BEGIN
+    SELECT nextval('global_id_seq') INTO value;
+    l1:= (value >> 16) & 65535;
+    r1:= value & 65535;
+    WHILE i < 3 LOOP
+        l2 := r1;
+        r2 := l1 # ((((1366 * r1 + 150889) %% 714025) / 714025.0) * 32767)::int;
+        l1 := l2;
+        r1 := r2;
+        i := i + 1;
+    END LOOP;
+    RETURN ((r1 << 16) + l1);
+END;
+$$ LANGUAGE plpgsql strict immutable;
+'''.format(id_function_name)
+drop_id_function = 'DROP FUNCTION {}()'.format(id_function_name)
+event.listen(Base.metadata, 'before_create', DDL(create_id_function))
+event.listen(Base.metadata, 'after_drop', DDL(drop_id_function))
 
-class GlobalID(object):
-    id = Column(ID_TYPE, Sequence('global_id_seq'), primary_key=True)
+
+class ObscureID(object):
+    id = Column(ID_TYPE, server_default=func.obscure_id(), primary_key=True)
 
 
-class User(GlobalID, SecurityMixin, Base):
+class User(ObscureID, SecurityMixin, Base):
     username = Column(String, unique=True, nullable=False)
     email = Column(String, unique=True, nullable=False)
 
@@ -59,27 +92,17 @@ class User(GlobalID, SecurityMixin, Base):
         passive_deletes=True
     )
 
-    def generate_auth_token(self, expiration=None, **kwargs):
-        '''Generate an auth token with the hashed id as the payload.
-        '''
-        payload = dict(id=hashid.encode(self.id), **kwargs)
-        return super(User, self).generate_auth_token(expiration=expiration, **payload)
 
-    @classmethod
-    def verify_auth_token(cls, token):
-        '''Verify the auth token and return the claims with the decoded id if
-        valid and None if invalid.
-        '''
-        data = super(User, cls).verify_auth_token(token)
-        if data:
-            data.update(id=hashid.decode(data['id']))
-            return data
-
-
-class Questionnaire(GlobalID, Base):
+class Questionnaire(ObscureID, Base):
     title = Column(String, nullable=False)
     description = Column(String, nullable=False)
     version = Column(Integer)
+
+    # scores
+    # 0-5 subklinisch
+    # 5-9 klinisch
+    # 10-14 matig
+    # > 15 ernstig
 
     questions = relationship(
         'Question',
@@ -109,7 +132,7 @@ class Questionnaire(GlobalID, Base):
         return resp
 
 
-class Question(GlobalID, Base):
+class Question(ObscureID, Base):
     text = Column(String, nullable=False)
     ordinal = Column(Integer)
 
@@ -165,7 +188,7 @@ class AnswerResponse(Base):
     )
 
 
-class QuestionnaireResponse(GlobalID, Base):
+class QuestionnaireResponse(ObscureID, Base):
     __tablename__ = 'questionnaire_response'
 
     choices = relationship(
@@ -193,7 +216,7 @@ class QuestionnaireResponse(GlobalID, Base):
         self.choices = [AnswerResponse(**choice) for choice in choices]
 
 
-class Exercise(GlobalID, Base):
+class Exercise(ObscureID, Base):
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     author_id = Column(ID_TYPE, ForeignKey('user.id'))

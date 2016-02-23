@@ -46,6 +46,7 @@ class DevelopmentConfig(Config):
     BCRYPT_ROUNDS = 4
     INTENCODER_COPRIME = 4286190277
     INTENCODER_SALT = 'SaAaAalTy'
+    HASHID_SALT = 'SaAaAalTy'
 
 
 class TestingConfig(DevelopmentConfig):
