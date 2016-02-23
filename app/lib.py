@@ -2,6 +2,7 @@
 need the app's config values.
 '''
 
+
 import fractions
 import functools
 import random
@@ -10,12 +11,12 @@ import bcrypt
 import hashids
 
 from flask import (
+    abort,
     _app_ctx_stack,
-    Response,
+    current_app,
     jsonify,
     request,
-    current_app,
-    abort,
+    Response,
 )
 from itsdangerous import (
     BadSignature,
@@ -149,19 +150,21 @@ class FlaskIntEncoder(IntEncoder):
         self._coprime = None
         self._inverse = None
         self.hashid = None
+
         if app:
             self.init_app(app)
 
     def init_app(self, app):
-        self._bits = app.config.get('INTENCODER_BITS', 32)
         self._coprime = app.config['INTENCODER_COPRIME']
+        self._bits = app.config.get('INTENCODER_BITS', 32)
+        self._salt = app.config.get('INTENCODER_SALT', '')
+        self._inverse = self._get_modular_inverse(self._coprime, self._modulus)
 
         if fractions.gcd(self._modulus, self._coprime) != 1:
             message = 'The given coprime is not coprime to {}.'
             raise ValueError(message.format(self._modulus))
 
-        self._inverse = self._get_modular_inverse(self._coprime, self._modulus)
-        self.hashid = hashids.Hashids(salt=app.config.get('INTENCODER_SALT', ''))
+        self.hashid = hashids.Hashids(salt=self._salt)
         app.url_map.converters['hashid'] = self.id_converter
 
     @property
@@ -185,44 +188,60 @@ class FlaskIntEncoder(IntEncoder):
         return UrlConvertor
 
 
-class Password(str):
-    '''Subclass of string that implements string comparisons using Bcrypt.
+class BcryptStr(str):
+    '''Subclass of string that encrypts and implements string comparisons using
+    Bcrypt.
     '''
+    def __new__(cls, value, salt=None, crypt=True):
+        if isinstance(value, unicode):
+            value = value.encode('utf-8')
+        if crypt:
+            salt = salt or bcrypt.gensalt(cls.get_rounds())
+            value = bcrypt.hashpw(value, salt)
+        return str.__new__(cls, value)
+
+    @staticmethod
+    def get_rounds():
+        return current_app.config.get('BCRYPT_ROUNDS', 12)
+
     def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            other = other.encode('utf-8')
-            other = bcrypt.hashpw(other, self)
+        if not isinstance(other, BcryptStr):
+            other = BcryptStr(other, salt=self)
         return safe_str_cmp(self, other)
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
 
-class BcryptType(TypeDecorator):
+class Password(TypeDecorator):
     '''Persist Bcrypt hashes.'''
     impl = String(128)
 
-    @property
-    def rounds(self):
-        return current_app.config.get('BCRYPT_ROUNDS', 12)
+    def __init__(self, *args, **kwargs):
+        TypeDecorator.__init__(self, *args, **kwargs)
 
     def process_bind_param(self, value, dialect):
-        if value is not None:
-            value = value.encode('utf-8')
-            return bcrypt.hashpw(value, bcrypt.gensalt(self.rounds))
+        if value:
+            return BcryptStr(value)
 
     def process_result_value(self, value, dialect):
-        return Password(value)
+        return BcryptStr(value, crypt=False)
 
 
 class SecurityMixin(object):
-    password = Column(BcryptType, nullable=False)
+    password = Column(Password, nullable=False)
+
+    @staticmethod
+    def get_secret_key():
+        return current_app.config['SECRET_KEY']
+
+    @staticmethod
+    def get_token_expiration():
+        return current_app.config['TOKEN_EXPIRATION']
 
     def generate_auth_token(self, expiration=None, **payload):
-        secret_key = current_app.config['SECRET_KEY']
-        expiration = expiration or current_app.config.get('TOKEN_EXPIRATION')
-
-        s = Serializer(secret_key, expires_in=expiration)
+        s = Serializer(self.get_secret_key(),
+                       expires_in=self.get_token_expiration())
 
         return dict(access_token=s.dumps(payload),
                     expires_in=expiration,
@@ -230,8 +249,7 @@ class SecurityMixin(object):
 
     @classmethod
     def verify_auth_token(cls, token):
-        secret_key = current_app.config['SECRET_KEY']
-        s = Serializer(secret_key)
+        s = Serializer(cls.get_secret_key())
         try:
             return s.loads(token)
         except (SignatureExpired, BadSignature):
@@ -240,6 +258,7 @@ class SecurityMixin(object):
 
 class Auth(object):
     # TODO return proper errors
+    # TODO Make it a Flask extension and attach error handlers to the app
 
     def __init__(self):
         self.verify_token_callback = None
