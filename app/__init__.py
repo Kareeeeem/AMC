@@ -22,8 +22,4 @@ def create_app(config_name):
     from app.api.v1 import auth
     app.register_blueprint(auth.bp)
 
-    @app.teardown_appcontext
-    def shutdown_session(exc=None):
-        db.session.remove()
-
     return app

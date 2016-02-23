@@ -36,15 +36,30 @@ class Database(object):
     def __init__(self, app=None):
         self.engine = None
         self.session = None
+
         if app:
             self.init_app(app)
 
     def init_app(self, app):
-        self.engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'],
-                                    echo=app.config.get('SQLALCHEMY_ECHO', False),
+        self.database_uri = app.config['SQLALCHEMY_DATABASE_URI']
+        self.echo = app.config.get('SQLALCHEMY_ECHO', False)
+        self.create_engine()
+        self.create_scoped_session()
+
+        # register teardown function on the application
+        app.teardown_appcontext(self.teardown)
+
+    def create_engine(self):
+        self.engine = create_engine(self.database_uri,
+                                    echo=self.echo,
                                     convert_unicode=True)
+
+    def create_scoped_session(self):
         self.session = scoped_session(sessionmaker(bind=self.engine),
                                       scopefunc=_app_ctx_stack.__ident_func__)
+
+    def teardown(self, exception=None):
+        self.session.remove()
 
 
 class HandleJSONReponse(Response):
