@@ -1,92 +1,23 @@
-import datetime
-
 from sqlalchemy import (
     Column,
-    DateTime,
-    DDL,
-    event,
     ForeignKey,
     ForeignKeyConstraint,
     Integer,
-    Sequence,
     String,
     Text,
     UniqueConstraint
 )
-from sqlalchemy.sql import expression
-from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship, backref
 
-from app.lib import SecurityMixin
-
+from app.lib import SecurityMixin, ObscureIDMixin
+from app import db
 
 ID_TYPE = Integer
+Base = db.Base
 
 
-# TODO extract making and filling in questionnaires with validation into it's own class
-# TODO figure out postgresql row_to_json function
-# TODO customize id_function
-
-
-class BaseModel(object):
-    @declared_attr
-    def __tablename__(cls):
-        '''Set the table name to the lowercase version of the class name'''
-        return cls.__name__.lower()
-
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow,
-                        onupdate=datetime.datetime.utcnow)
-
-
-Base = declarative_base(cls=BaseModel)
-global_id_seq = Sequence('global_id_seq', metadata=Base.metadata)
-
-id_function_signature = 'obscure_id(value bigint)'
-create_id_function = '''
-CREATE OR REPLACE FUNCTION {name} returns bigint AS $$
-DECLARE
-l1 int;
-l2 int;
-r1 int;
-r2 int;
-i int:=0;
-BEGIN
-    l1:= (value >> 16) & 65535;
-    r1:= value & 65535;
-    WHILE i < 3 LOOP
-        l2 := r1;
-        r2 := l1 # (((({coprime}.0 * r1 + 150889) %% {modulus}) / {modulus}.0) * 32767)::int;
-        l1 := l2;
-        r1 := r2;
-        i := i + 1;
-    END LOOP;
-    RETURN ((r1 << 16) + l1);
-END;
-$$ LANGUAGE plpgsql strict immutable;
-'''.format(name=id_function_signature, coprime=45896, modulus=1048575)
-event.listen(Base.metadata, 'before_create', DDL(create_id_function))
-
-drop_id_function = 'DROP FUNCTION {}'.format(id_function_signature)
-event.listen(Base.metadata, 'after_drop', DDL(drop_id_function))
-
-
-class make_id(expression.FunctionElement):
-    type = Integer()
-
-
-@compiles(make_id, 'postgresql')
-def pg_make_id(element, compiler, **kwargs):
-    return "obscure_id(nextval('global_id_seq'))"
-
-
-class ObscureID(object):
-    id = Column(ID_TYPE, server_default=make_id(), primary_key=True)
-
-
-class User(ObscureID, SecurityMixin, Base):
+class User(ObscureIDMixin, SecurityMixin, Base):
     username = Column(String(32), unique=True, nullable=False)
     email = Column(String, unique=True, nullable=False)
 
@@ -98,11 +29,11 @@ class User(ObscureID, SecurityMixin, Base):
     questionnaire_responses = relationship(
         'QuestionnaireResponse',
         cascade='all, delete-orphan',
-        passive_deletes=True
+        passive_deletes=True,
     )
 
 
-class Questionnaire(ObscureID, Base):
+class Questionnaire(ObscureIDMixin, Base):
     title = Column(String, nullable=False)
     description = Column(String, nullable=False)
     version = Column(Integer)
@@ -141,7 +72,7 @@ class Questionnaire(ObscureID, Base):
         return resp
 
 
-class Question(ObscureID, Base):
+class Question(ObscureIDMixin, Base):
     text = Column(String, nullable=False)
     ordinal = Column(Integer)
 
@@ -197,7 +128,7 @@ class AnswerResponse(Base):
     )
 
 
-class QuestionnaireResponse(ObscureID, Base):
+class QuestionnaireResponse(ObscureIDMixin, Base):
     __tablename__ = 'questionnaire_response'
 
     choices = relationship(
@@ -225,7 +156,7 @@ class QuestionnaireResponse(ObscureID, Base):
         self.choices = [AnswerResponse(**choice) for choice in choices]
 
 
-class Exercise(ObscureID, Base):
+class Exercise(ObscureIDMixin, Base):
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     author_id = Column(ID_TYPE, ForeignKey('user.id'))
