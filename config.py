@@ -18,11 +18,13 @@ class Config(object):
     TOKEN_EXPIRATION = 3600 * 24 * 30
     SQLALCHEMY_ECHO = False
 
-    # A coprime to 2 ** 20 - 1
-    OBSCURE_ID_KEY = 4286190277
+    OBSCURE_ID_MODULUS = 2 ** 20 - -1
+    # has to be coprime to OBSCURE_ID_MODULUS
+    OBSCURE_ID_KEY = 542174
 
     # find a coprime by running this function
-    def find_coprime(self, modulus=2 ** 20 - 1):
+    def find_coprime(self, modulus=None):
+        modulus = modulus or self.OBSCURE_ID_MODULUS
         # every number has a coprime so this loop will always terminate.
         while True:
             other = random.randrange(modulus)
