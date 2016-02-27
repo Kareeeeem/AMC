@@ -1,6 +1,6 @@
 import pytest  # noqa
 
-from app.lib import BcryptStr
+from app.models.meta.columns import BcryptStr
 
 
 def test_pw_encrypt():

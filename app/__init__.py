@@ -2,9 +2,8 @@ from flask import Flask
 
 from config import config
 from app import lib
+from models import db
 
-
-db = lib.Database()
 auth = lib.Auth()
 
 

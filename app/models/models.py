@@ -5,21 +5,24 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint
+    UniqueConstraint,
 )
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship, backref
 
-from app.lib import SecurityMixin, ObscureIDMixin
-from app import db
+from meta.orm import db
+from meta.mixins import TokenMixin
+from meta.columns import IDColumn, PasswordColumn
 
 ID_TYPE = Integer
 Base = db.Base
 
 
-class User(ObscureIDMixin, SecurityMixin, Base):
+class User(TokenMixin, Base):
+    id = IDColumn()
     username = Column(String(32), unique=True, nullable=False)
     email = Column(String, unique=True, nullable=False)
+    password = PasswordColumn()
 
     exercises = relationship(
         'Exercise',
@@ -33,7 +36,8 @@ class User(ObscureIDMixin, SecurityMixin, Base):
     )
 
 
-class Questionnaire(ObscureIDMixin, Base):
+class Questionnaire(Base):
+    id = IDColumn()
     title = Column(String, nullable=False)
     description = Column(String, nullable=False)
     version = Column(Integer)
@@ -67,12 +71,13 @@ class Questionnaire(ObscureIDMixin, Base):
     def create_response(self, **kwargs):
         '''Create a questionnaire response and associate it with `self`.
         '''
-        resp = QuestionnaireResponse(**kwargs)
-        self.responses.append(resp)
-        return resp
+        response = QuestionnaireResponse(**kwargs)
+        self.responses.append(response)
+        return response
 
 
-class Question(ObscureIDMixin, Base):
+class Question(Base):
+    id = IDColumn()
     text = Column(String, nullable=False)
     ordinal = Column(Integer)
 
@@ -99,12 +104,12 @@ class Question(ObscureIDMixin, Base):
 class Answer(Base):
     # No standard id. The question id and value identifies the row uniquely.
     value = Column(Integer, primary_key=True, autoincrement=False)
+    text = Column(String, nullable=False)
     question_id = Column(
         ID_TYPE,
         ForeignKey('question.id', ondelete='CASCADE'),
         primary_key=True
     )
-    text = Column(String, nullable=False)
 
 
 class AnswerResponse(Base):
@@ -128,21 +133,20 @@ class AnswerResponse(Base):
     )
 
 
-class QuestionnaireResponse(ObscureIDMixin, Base):
+class QuestionnaireResponse(Base):
     __tablename__ = 'questionnaire_response'
 
+    id = IDColumn()
     choices = relationship(
         'AnswerResponse',
         cascade='all, delete-orphan',
         passive_deletes=True,
     )
-
     user_id = Column(
         ID_TYPE,
         ForeignKey('user.id', ondelete='CASCADE'),
         nullable=False
     )
-
     questionnaire_id = Column(
         ID_TYPE,
         ForeignKey('questionnaire.id', ondelete='CASCADE'),
@@ -156,7 +160,21 @@ class QuestionnaireResponse(ObscureIDMixin, Base):
         self.choices = [AnswerResponse(**choice) for choice in choices]
 
 
-class Exercise(ObscureIDMixin, Base):
+class Exercise(Base):
+    id = IDColumn()
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     author_id = Column(ID_TYPE, ForeignKey('user.id'))
+
+
+__all__ = [
+    'Base',
+    'db',
+    'User',
+    'Questionnaire',
+    'Question',
+    'Answer',
+    'AnswerResponse',
+    'QuestionnaireResponse',
+    'Exercise',
+]

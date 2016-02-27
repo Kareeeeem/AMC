@@ -1,18 +1,101 @@
 '''This module contains general utils, some of which require an app context.
 '''
+import inspect
 import functools
 import fractions
 import random
 
 import hashids
 
-from flask import (
-    abort,
-    jsonify,
-    Response,
-    request,
-)
+from flask import abort, current_app, jsonify, request, Response
 from werkzeug.routing import BaseConverter
+
+
+class FallbackError(Exception):
+    def __init__(self, cls, key, *args, **kwargs):
+        msg = "type object '{type}' has no fallback defined '{key}'.".format(
+            type=cls.__name__, key=key)
+        Exception.__init__(self, msg, *args, **kwargs)
+
+
+class ConfigDescriptor(object):
+    '''A descriptor that attempts to get a value from the application config.
+    '''
+    def __init__(self, key, fallback=False, with_fallback=False):
+        self.key = key
+        self.fallback = fallback
+        self.with_fallback = with_fallback
+
+    def __get__(self, obj, type):
+        try:
+            return current_app.config.get(self.key)
+        except RuntimeError:
+            if self.with_fallback:
+                return self.fallback
+            else:
+                raise FallbackError(type, self.key)
+
+
+class with_app_config(object):
+    '''Decorator that accepts any number of keys as arguments and makes those
+    application config values available to the decorated class or function. In
+    the case of a class the config value is accesible as an attribute. In the
+    case of a function it is passed to as a keyword argument.
+
+    usage:
+        app.config['CONFIG_KEY'] = 'hi'
+
+        @with_config('CONFIG_KEY')
+        def foo(CONFIG_KEY='bye'):
+            print CONFIG_KEY
+
+        >>> foo()
+        >>> 'hi'
+
+        app.config['CONFIG_KEY'] = 'hello'
+
+        @with_config['CONFIG_KEY']
+        class Foo(object):
+            CONFIG_KEY = 'greetings'
+
+        >>> f = Foo()
+        >>> f.CONFIG_KEY
+        >>> 'hello'
+
+    When the the function or class is used outside of an application context
+    it will use the default value if provided.
+    '''
+    def __init__(self, *keys):
+        self.keys = keys
+
+    def __call__(self, decorated):
+        # If decorated is a class replace the attribute(s) with descriptor(s).
+        # This way wen use attribute access syntax (dot syntax) for both the
+        # Class and it's instance.
+        if inspect.isclass(decorated):
+            for key in self.keys:
+                with_fallback, fallback = False, None
+                try:
+                    fallback = getattr(decorated, key)
+                    with_fallback = True
+                except AttributeError:
+                    pass
+                descriptor = ConfigDescriptor(key, fallback, with_fallback)
+                setattr(decorated, key, descriptor)
+            return decorated
+
+        # If decorated is a function inject the config values into kwargs when
+        # the function is called.
+        else:
+            @functools.wraps(decorated)
+            def wrapper(*args, **kwargs):
+                try:
+                    kwargs.update({key: current_app.config.get(key)
+                                   for key in self.keys})
+                except RuntimeError:
+                    pass
+                return decorated(*args, **kwargs)
+            return wrapper
 
 
 class HandleJSONReponse(Response):
@@ -127,9 +210,6 @@ class HashIDConverter(BaseConverter):
 
 
 class Auth(object):
-    # TODO return proper errors
-    # TODO Make it a Flask extension and attach error handlers to the app
-
     def __init__(self):
         self.verify_token_callback = None
 
