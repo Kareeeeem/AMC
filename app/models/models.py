@@ -1,5 +1,8 @@
+import datetime
+
 from sqlalchemy import (
     Column,
+    DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Integer,
@@ -11,18 +14,20 @@ from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship, backref
 
 from meta.orm import db
-from meta.mixins import TokenMixin
+from meta.mixins import TokenMixin, CreatedUpdatedMixin
 from meta.columns import IDColumn, PasswordColumn
 
 ID_TYPE = Integer
 Base = db.Base
 
 
-class User(TokenMixin, Base):
+class User(Base, TokenMixin, CreatedUpdatedMixin):
     id = IDColumn()
+    password = PasswordColumn()
+
     username = Column(String(32), unique=True, nullable=False)
     email = Column(String, unique=True, nullable=False)
-    password = PasswordColumn()
+    last_login = Column(DateTime)
 
     exercises = relationship(
         'Exercise',
@@ -34,6 +39,12 @@ class User(TokenMixin, Base):
         cascade='all, delete-orphan',
         passive_deletes=True,
     )
+
+    def login(self, session):
+        self.last_login = datetime.datetime.utcnow()
+        db.session.commit()
+        rv = self.generate_auth_token()
+        return rv
 
 
 class Questionnaire(Base):
@@ -168,13 +179,13 @@ class Exercise(Base):
 
 
 __all__ = [
-    'Base',
-    'db',
-    'User',
-    'Questionnaire',
-    'Question',
     'Answer',
     'AnswerResponse',
-    'QuestionnaireResponse',
+    'Base',
+    'db',
     'Exercise',
+    'Question',
+    'Questionnaire',
+    'QuestionnaireResponse',
+    'User',
 ]

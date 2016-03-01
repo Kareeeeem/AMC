@@ -1,5 +1,3 @@
-import pytest  # noqa
-
 from app.lib import IntEncoder
 
 

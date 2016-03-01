@@ -1,7 +1,7 @@
--e git+http://github.com/mitsuhiko/flask.git#egg=Flask-dev
+-e git+http://github.com/mitsuhiko/flask.git@e7d548595e8f2f03fb58c827bef8abae2f84aa59#egg=Flask-master
 -e .
 
-marshmallow==2.5.0
+marshmallow==2.6.0
 psycopg2==2.6.1
 SQLAlchemy==1.0.11
 bcrypt==2.0.0

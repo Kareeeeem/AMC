@@ -1,14 +1,27 @@
 '''This module contains general utils, some of which require an app context.
 '''
-import inspect
-import functools
 import fractions
+import functools
+import inspect
 import random
 
 import hashids
 
-from flask import abort, current_app, jsonify, request, Response
+from flask import (
+    abort,
+    current_app,
+    jsonify,
+    request,
+    Response,
+    url_for,
+)
 from werkzeug.routing import BaseConverter
+
+
+def location_header(route, **kwargs):
+    '''Return a location header.
+    '''
+    return {'Location': url_for(route, **kwargs)}
 
 
 class FallbackError(Exception):
@@ -209,14 +222,35 @@ class HashIDConverter(BaseConverter):
         return HashIDConverter_
 
 
+class AuthorizationError(Exception):
+    def __init__(self, msg=None, status_code=401, *args, **kwargs):
+        self.msg = msg or "Unauthorized request"
+        self.status_code = status_code
+        self.response = dict(status=self.status_code, message=self.msg)
+        Exception.__init__(self, msg, *args, **kwargs)
+
+    def __str__(self):
+        return repr(self.msg)
+
+
 class Auth(object):
-    def __init__(self):
+    '''AUthorization class that manages and OAuth authorization flow following
+    https://stormpath.com/blog/the-ultimate-guide-to-mobile-api-security/.
+    '''
+    def __init__(self, app=None):
         self.verify_token_callback = None
+        self.verify_login_callback = None
 
-        def error_handler():
-            abort(401)
+        if app:
+            self.init_app(app)
 
-        self.error_handler_callback = error_handler
+    def init_app(self, app):
+        '''Initialize the extension with the app. That means registering a
+        default authorization error handlder.
+        '''
+        @app.errorhandler(AuthorizationError)
+        def unauthorized(exception):
+            return exception.response, exception.status_code
 
     def verify_token(self, f):
         '''Registers a callback to be run to validate the token. The callback
@@ -225,22 +259,45 @@ class Auth(object):
         self.verify_token_callback = f
         return f
 
-    def error_handler(self, f):
-        '''Registers a callback to be run when the token is invalid.
+    def verify_login(self, f):
+        '''Registers a callback to be run to validate the username or email
+        and password. The callback should return True in case of success.
         '''
-        self.error_handler_callback = f
+        self.verify_login_callback = f
         return f
 
     def login_required(self, f):
         '''Decorate a route with this function to mark it as login required.
         '''
         @functools.wraps(f)
-        def decorated(*args, **kwargs):
-            # https://github.com/miguelgrinberg/Flask-HTTPAuth/blob/master/flask_httpauth.py#L51-L55
+        def wrapper(*args, **kwargs):
+            form = request.form
+
+            if form.get('grant_type') != 'password':
+                raise AuthorizationError
+
+            username = form.get('username')
+            password = form.get('password')
+
+            if not username or not password \
+                    or not self.verify_login_callback(username, password):
+                raise AuthorizationError
+
+            return f(*args, **kwargs)
+        return wrapper
+
+    def token_required(self, f):
+        '''Decorate a route with this function to mark it as token required.
+        '''
+        # https://github.com/miguelgrinberg/Flask-HTTPAuth/blob/master/flask_httpauth.py#L51-L55
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
             if request.method != 'OPTIONS':
                 auth = request.headers.get('Authorization', ' ')
                 token_type, token = auth.split(' ')
+
                 if token_type != 'Bearer' or not self.verify_token_callback(token):
-                    self.error_handler_callback()
+                    raise AuthorizationError
+
             return f(*args, **kwargs)
-        return decorated
+        return wrapper

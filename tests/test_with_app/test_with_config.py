@@ -1,5 +1,3 @@
-import pytest  # noqa
-
 from app.lib import with_app_config
 
 # the tests outside of application context (to test fallbacks) are here:
