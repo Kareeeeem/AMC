@@ -1,40 +1,36 @@
 import random
-import functools
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql import func
 
-import pytest  # noqa
+import pytest
 
 from app import models
 
-# generate answers to questionnaire
-values = [random.randrange(3) for i in range(10)]
 
-
-def generate_response(answers, questionnaire):
+def generate_response(questionnaire):
     choices = []
-    for i, question in enumerate(questionnaire.questions):
-        choices.append(dict(question_id=question.id, value=answers[i]))
+    for question in questionnaire.questions:
+        choice = dict(question_id=question.id,
+                      value=random.choice(question.options).value)
+        choices.append(choice)
     return dict(choices=choices)
-
-generate_response = functools.partial(generate_response, values)
 
 
 def test_no_two_answers_for_one_question(amisos, user, session):
     resp = generate_response(amisos)
     resp['choices'][1]['question_id'] = resp['choices'][0]['question_id']
-    user.questionnaire_responses.append(amisos.create_response(**resp))
+    user.fill_in_questionnaire(amisos, **resp)
     with pytest.raises(IntegrityError):
         session.commit()
 
 
 def test_response_score(amisos, user, session):
     resp = generate_response(amisos)
-    user.questionnaire_responses.append(amisos.create_response(**resp))
+    user.fill_in_questionnaire(amisos, **resp)
     session.commit()
 
-    score = session.query(func.sum(models.AnswerResponse.value)).\
+    score = session.query(func.sum(models.Choice.value)).\
         join(models.QuestionnaireResponse).\
         filter(models.QuestionnaireResponse.user_id == user.id).\
         group_by(models.QuestionnaireResponse.id).\
@@ -46,7 +42,36 @@ def test_response_score(amisos, user, session):
 def test_delete_questionnaire(user, amisos, session):
     session.delete(amisos)
     session.commit()
-    count = session.query(models.Question, models.Answer).\
-        join(models.Answer).\
+    count = session.query(models.Question, models.Option).\
+        join(models.Option).\
         count()
     assert count == 0
+
+
+def test_questionnaire_response_score(user, amisos, session):
+    choices1 = []
+    for question in amisos.questions:
+        choice = dict(question_id=question.id, value=0)
+        choices1.append(choice)
+    response1 = dict(choices=choices1)
+    resp1 = user.fill_in_questionnaire(amisos, **response1)
+
+    choices2 = []
+    for question in amisos.questions:
+        choice = dict(question_id=question.id, value=2)
+        choices2.append(choice)
+    response2 = dict(choices=choices2)
+    resp2 = user.fill_in_questionnaire(amisos, **response2)
+
+    choices3 = []
+    for question in amisos.questions:
+        choice = dict(question_id=question.id, value=1)
+        choices3.append(choice)
+    response3 = dict(choices=choices3)
+    resp3 = user.fill_in_questionnaire(amisos, **response3)
+
+    session.commit()
+
+    assert [resp1.score.name,
+            resp2.score.name,
+            resp3.score.name] == ['subklinisch', 'ernstig', 'matig']

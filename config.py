@@ -8,6 +8,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 
 class Config(object):
+    SQLALCHEMY_ECHO = False
     CSRF_ENABLED = True
     DEBUG = False
     TESTING = False
@@ -16,7 +17,6 @@ class Config(object):
     BCRYPT_ROUNDS = 12
     # one month
     TOKEN_EXPIRATION = 3600 * 24 * 30
-    SQLALCHEMY_ECHO = False
 
     OBSCURE_ID_MODULUS = 2 ** 20 - -1
     # has to be coprime to OBSCURE_ID_MODULUS
@@ -57,6 +57,7 @@ class Config(object):
 
 
 class DevelopmentConfig(Config):
+    SQLALCHEMY_ECHO = True
     DEBUG = True
     SECRET_KEY = 'seekrit'
     HASHID_SALT = 'SaAaAalTy'

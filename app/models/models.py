@@ -1,4 +1,5 @@
 import datetime
+from psycopg2.extras import NumericRange
 
 from sqlalchemy import (
     Column,
@@ -10,6 +11,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import INT4RANGE
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship, backref
 
@@ -38,6 +40,7 @@ class User(Base, TokenMixin, CreatedUpdatedMixin):
         'QuestionnaireResponse',
         cascade='all, delete-orphan',
         passive_deletes=True,
+        order_by='QuestionnaireResponse.created_at',
     )
 
     def login(self, session):
@@ -46,6 +49,14 @@ class User(Base, TokenMixin, CreatedUpdatedMixin):
         rv = self.generate_auth_token()
         return rv
 
+    def fill_in_questionnaire(self, questionnaire, **kwargs):
+        '''Create a questionnaire response.
+        '''
+        response = QuestionnaireResponse(questionnaire_id=questionnaire.id,
+                                         **kwargs)
+        self.questionnaire_responses.append(response)
+        return response
+
 
 class Questionnaire(Base):
     id = IDColumn()
@@ -53,11 +64,11 @@ class Questionnaire(Base):
     description = Column(String, nullable=False)
     version = Column(Integer)
 
-    # scores
-    # 0-5 subklinisch
-    # 5-9 klinisch
-    # 10-14 matig
-    # > 15 ernstig
+    possible_scores = relationship(
+        'Score',
+        cascade='all, delete-orphan',
+        passive_deletes=True,
+    )
 
     questions = relationship(
         'Question',
@@ -75,16 +86,29 @@ class Questionnaire(Base):
 
     def __init__(self, **kwargs):
         questions = kwargs.pop('questions')
-        for key, value in kwargs.iteritems():
-            setattr(self, key, value)
         self.questions = [Question(**question) for question in questions]
 
-    def create_response(self, **kwargs):
-        '''Create a questionnaire response and associate it with `self`.
-        '''
-        response = QuestionnaireResponse(**kwargs)
-        self.responses.append(response)
-        return response
+        scores = kwargs.pop('scores')
+        for score in scores:
+            range = NumericRange(lower=score['min'],
+                                 upper=score.get('max', None),
+                                 bounds='[]')
+            self.possible_scores.append(Score(name=score['name'], range=range))
+
+        for key, value in kwargs.iteritems():
+            setattr(self, key, value)
+
+
+class Score(Base):
+    # No standard id. The questionnaire id and name identify the row uniquely.
+    range = Column(INT4RANGE, nullable=False)
+    name = Column(String(60), nullable=False, primary_key=True)
+    questionnaire_id = Column(
+        ID_TYPE,
+        ForeignKey('questionnaire.id', ondelete='CASCADE'),
+        nullable=False,
+        primary_key=True,
+    )
 
 
 class Question(Base):
@@ -92,10 +116,10 @@ class Question(Base):
     text = Column(String, nullable=False)
     ordinal = Column(Integer)
 
-    answers = relationship(
-        'Answer',
+    options = relationship(
+        'Option',
         backref='question',
-        order_by='Answer.value',
+        order_by='Option.value',
         cascade='all, delete-orphan',
         passive_deletes=True,
     )
@@ -106,14 +130,15 @@ class Question(Base):
     )
 
     def __init__(self, **kwargs):
-        answers = kwargs.pop('answers')
+        options = kwargs.pop('options')
         for key, value in kwargs.iteritems():
             setattr(self, key, value)
-        self.answers = [Answer(**answer) for answer in answers]
+        self.options = [Option(**option) for option in options]
 
 
-class Answer(Base):
-    # No standard id. The question id and value identifies the row uniquely.
+class Option(Base):
+    __tablename__ = 'option'
+    # No standard id. The question id and value identify the row uniquely.
     value = Column(Integer, primary_key=True, autoincrement=False)
     text = Column(String, nullable=False)
     question_id = Column(
@@ -123,9 +148,7 @@ class Answer(Base):
     )
 
 
-class AnswerResponse(Base):
-    __tablename__ = 'answer_response'
-
+class Choice(Base):
     value = Column(ID_TYPE, primary_key=True, autoincrement=False)
     question_id = Column(ID_TYPE, primary_key=True, autoincrement=False)
     response_id = Column(
@@ -137,27 +160,49 @@ class AnswerResponse(Base):
     __table_args__ = (
         ForeignKeyConstraint(
             ['value', 'question_id'],
-            ['answer.value', 'answer.question_id'],
+            ['option.value', 'option.question_id'],
             ondelete='CASCADE'
         ),
         UniqueConstraint('question_id', 'response_id')
     )
 
 
-class QuestionnaireResponse(Base):
+class QuestionnaireResponse(Base, CreatedUpdatedMixin):
     __tablename__ = 'questionnaire_response'
 
     id = IDColumn()
+
+    # This relationship joins to Score where the questionnaire ids match
+    # and where the sum of the choices values of this response are
+    # contained in the score range. Generates the following SQL.
+    #
+    # FROM score
+    # WHERE score.questionnaire_id = %(param_1)s AND
+    # (score.range @> CAST((SELECT sum(choice.value) AS sum_1
+    #  FROM choice
+    #  WHERE choice.response_id = %(param_2)s) AS INTEGER))
+    score = relationship(
+        'Score',
+        uselist=False,
+        lazy='joined',
+        primaryjoin=('''
+and_(foreign(Score.questionnaire_id)==QuestionnaireResponse.questionnaire_id,
+Score.range.contains(cast(select([func.sum(Choice.value)]).
+where(Choice.response_id == QuestionnaireResponse.id).as_scalar(), Integer)))
+'''))
+
     choices = relationship(
-        'AnswerResponse',
+        'Choice',
         cascade='all, delete-orphan',
         passive_deletes=True,
     )
+
     user_id = Column(
         ID_TYPE,
         ForeignKey('user.id', ondelete='CASCADE'),
         nullable=False
     )
+
     questionnaire_id = Column(
         ID_TYPE,
         ForeignKey('questionnaire.id', ondelete='CASCADE'),
@@ -168,7 +213,7 @@ class QuestionnaireResponse(Base):
         choices = kwargs.pop('choices')
         for key, value in kwargs.iteritems():
             setattr(self, key, value)
-        self.choices = [AnswerResponse(**choice) for choice in choices]
+        self.choices = [Choice(**choice) for choice in choices]
 
 
 class Exercise(Base):
@@ -179,11 +224,11 @@ class Exercise(Base):
 
 
 __all__ = [
-    'Answer',
-    'AnswerResponse',
     'Base',
+    'Choice',
     'db',
     'Exercise',
+    'Option',
     'Question',
     'Questionnaire',
     'QuestionnaireResponse',
