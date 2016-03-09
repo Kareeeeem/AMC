@@ -81,34 +81,40 @@ class with_app_config(object):
     def __init__(self, *keys):
         self.keys = keys
 
-    def __call__(self, decorated):
-        # If decorated is a class replace the attribute(s) with descriptor(s).
-        # This way wen use attribute access syntax (dot syntax) for both the
-        # Class and it's instance.
-        if inspect.isclass(decorated):
-            for key in self.keys:
-                with_fallback, fallback = False, None
-                try:
-                    fallback = getattr(decorated, key)
-                    with_fallback = True
-                except AttributeError:
-                    pass
-                descriptor = ConfigDescriptor(key, fallback, with_fallback)
-                setattr(decorated, key, descriptor)
-            return decorated
+    # If decorated is a class replace the attribute(s) with descriptor(s).
+    # This way wen use attribute access syntax (dot syntax) for both the
+    # Class and it's instance.
+    def decorate_class(self, cls):
+        for key in self.keys:
+            with_fallback, fallback = False, None
+            try:
+                fallback = getattr(cls, key)
+                with_fallback = True
+            except AttributeError:
+                pass
+            descriptor = ConfigDescriptor(key, fallback, with_fallback)
+            setattr(cls, key, descriptor)
+        return cls
 
-        # If decorated is a function inject the config values into kwargs when
-        # the function is called.
+    # If decorated is a function inject the config values into kwargs when
+    # the function is called.
+    def decorate_function(self, f):
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
+            try:
+                kwargs.update({key: current_app.config.get(key)
+                               for key in self.keys})
+            except RuntimeError:
+                pass
+            return f(*args, **kwargs)
+        return wrapper
+
+    def __call__(self, decorated):
+        if inspect.isclass(decorated):
+            return self.decorate_class(decorated)
+
         else:
-            @functools.wraps(decorated)
-            def wrapper(*args, **kwargs):
-                try:
-                    kwargs.update({key: current_app.config.get(key)
-                                   for key in self.keys})
-                except RuntimeError:
-                    pass
-                return decorated(*args, **kwargs)
-            return wrapper
+            return self.decorate_function(decorated)
 
 
 class HandleJSONReponse(Response):
