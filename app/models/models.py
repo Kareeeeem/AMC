@@ -1,17 +1,21 @@
 import datetime
-from psycopg2.extras import NumericRange
 
+from psycopg2.extras import NumericRange
 from sqlalchemy import (
     Column,
     DateTime,
+    DDL,
+    event,
     ForeignKey,
     ForeignKeyConstraint,
+    func,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import INT4RANGE
+from sqlalchemy.dialects.postgresql import INT4RANGE, JSONB, TSVECTOR
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship, backref
 
@@ -220,7 +224,52 @@ class Exercise(Base):
     id = IDColumn()
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
+    data = Column(JSONB)
+    tsv = Column(TSVECTOR)
     author_id = Column(ID_TYPE, ForeignKey('user.id'))
+
+    __table_args__ = Index('ix_exercise_tsv', 'tsv', postgresql_using='gin'),
+
+    @classmethod
+    def search(cls, session, query, limit=50, offset=0):
+        results = session.query(cls).\
+            filter(Exercise.tsv.match(query)).\
+            order_by(func.ts_rank(cls.tsv, func.to_tsquery(query)).desc()).\
+            limit(limit).\
+            offset(offset).\
+            all()
+        return results
+
+    def __repr__(self):
+        return '<Exercise(title={}, description={})>'.format(self.title,
+                                                             self.description)
+
+
+# This is used for full text search. The application will be in
+# dutch, hence the dutch config values for to_tsvector. Also make sure the
+# `default_text_search_config` is set to dutch in the application database.
+drop_ts_vector_ddl = 'DROP FUNCTION IF EXISTS exercise_trigger'
+ts_vector_ddl = '''
+CREATE OR REPLACE FUNCTION exercise_trigger() RETURNS trigger AS $$
+begin
+  new.tsv :=
+    setweight(to_tsvector('pg_catalog.dutch', coalesce(new.title,'')), 'A') ||
+    setweight(to_tsvector('pg_catalog.dutch', coalesce(new.description,'')), 'B');
+  return new;
+end
+$$ LANGUAGE plpgsql;
+'''
+
+drop_exercise_trigger_ddl = 'DROP TRIGGER IF EXISTS tsvectorupdate ON %(table)s'
+exercise_trigger_ddl = '''
+CREATE TRIGGER tsvectorupdate BEFORE INSERT OR UPDATE
+ON %(table)s FOR EACH ROW EXECUTE PROCEDURE exercise_trigger()
+'''
+
+event.listen(Exercise.__table__, 'after_create', DDL(ts_vector_ddl))
+event.listen(Exercise.__table__, 'after_create', DDL(exercise_trigger_ddl))
+event.listen(Exercise.__table__, 'before_drop', DDL(drop_exercise_trigger_ddl))
+event.listen(Exercise.__table__, 'before_drop', DDL(drop_ts_vector_ddl))
 
 
 __all__ = [

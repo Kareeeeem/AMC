@@ -24,8 +24,11 @@ Make super system dependencies are installed for
 * psycopg2
 * bcrypt
 
-Make sure you install hstore extension on postgres. As pg superuser run
-`psql application_db -c 'create extension hstore;'`
+To make full text search work run this query as the database owner.
+```
+ALTER DATABASE {database} SET
+default_text_search_config TO 'dutch';
+```
 
 #Project structure
 ```

@@ -58,6 +58,12 @@ def fill(obj):
         amisos = models.Questionnaire(**data)
         db.session.add(amisos)
 
+    exercise = models.Exercise(
+        title='een nieuwe oefening',
+        description='deze oefening is behulpzaam voor het onderhouden van uw mentale gezondheid. dit is bewezen door studies.')
+
+    db.session.add(exercise)
+
     db.session.commit()
 
 
