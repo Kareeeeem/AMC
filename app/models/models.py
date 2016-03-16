@@ -26,6 +26,8 @@ from meta.columns import IDColumn, PasswordColumn
 ID_TYPE = Integer
 Base = db.Base
 
+# TODO add repr methods
+
 
 class User(Base, TokenMixin, CreatedUpdatedMixin):
     id = IDColumn()
@@ -248,7 +250,7 @@ class Exercise(Base):
 # This is used for full text search. The application will be in
 # dutch, hence the dutch config values for to_tsvector. Also make sure the
 # `default_text_search_config` is set to dutch in the application database.
-drop_ts_vector_ddl = 'DROP FUNCTION IF EXISTS exercise_trigger'
+drop_ts_vector_ddl = 'DROP FUNCTION IF EXISTS exercise_trigger()'
 ts_vector_ddl = '''
 CREATE OR REPLACE FUNCTION exercise_trigger() RETURNS trigger AS $$
 begin
