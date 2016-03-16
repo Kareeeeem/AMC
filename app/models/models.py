@@ -26,8 +26,6 @@ from meta.columns import IDColumn, PasswordColumn
 ID_TYPE = Integer
 Base = db.Base
 
-# TODO add repr methods
-
 
 class User(Base, TokenMixin, CreatedUpdatedMixin):
     id = IDColumn()
@@ -62,6 +60,18 @@ class User(Base, TokenMixin, CreatedUpdatedMixin):
                                          **kwargs)
         self.questionnaire_responses.append(response)
         return response
+
+    def __repr__(self):
+        return ('User(id=%r, username=%r, email=%r, created_at=%r, '
+                'updated_at=%r, last_login=%r, password=%r)' % (
+                    self.id,
+                    self.username,
+                    self.email,
+                    self.created_at,
+                    self.updated_at,
+                    self.last_login,
+                    self.password,
+                ))
 
 
 class Questionnaire(Base):
@@ -104,6 +114,14 @@ class Questionnaire(Base):
         for key, value in kwargs.iteritems():
             setattr(self, key, value)
 
+    def __repr__(self):
+        return ('Questionnaire(id=%r, title=%r, description=%r, version=%r)' % (
+            self.id,
+            self.title,
+            self.description,
+            self.version,
+        ))
+
 
 class Score(Base):
     # No standard id. The questionnaire id and name identify the row uniquely.
@@ -115,6 +133,13 @@ class Score(Base):
         nullable=False,
         primary_key=True,
     )
+
+    def __repr__(self):
+        return 'Score(range=%r, name=%r, questionnaire_id=%r)' % (
+            self.range,
+            self.name,
+            self.questionnaire_id,
+        )
 
 
 class Question(Base):
@@ -141,6 +166,14 @@ class Question(Base):
             setattr(self, key, value)
         self.options = [Option(**option) for option in options]
 
+    def __repr__(self):
+        return 'Question(id=%r, text=%r, ordinal=%r, questionnaire_id=%r)' % (
+            self.id,
+            self.text,
+            self.ordinal,
+            self.questionnaire_id,
+        )
+
 
 class Option(Base):
     __tablename__ = 'option'
@@ -152,6 +185,13 @@ class Option(Base):
         ForeignKey('question.id', ondelete='CASCADE'),
         primary_key=True
     )
+
+    def __repr__(self):
+        return 'Option(value=%r, text=%r, question_id=%r)' % (
+            self.value,
+            self.text,
+            self.question_id,
+        )
 
 
 class Choice(Base):
@@ -171,6 +211,13 @@ class Choice(Base):
         ),
         UniqueConstraint('question_id', 'response_id')
     )
+
+    def __repr__(self):
+        return 'Choice(value=%r, question_id=%r, response_id=%r)' % (
+            self.value,
+            self.question_id,
+            self.response_id,
+        )
 
 
 class QuestionnaireResponse(Base, CreatedUpdatedMixin):
@@ -221,8 +268,17 @@ where(Choice.response_id == QuestionnaireResponse.id).as_scalar(), Integer)))
             setattr(self, key, value)
         self.choices = [Choice(**choice) for choice in choices]
 
+    def __repr__(self):
+        return ('QuestionnaireResponse(user_id=%r, question_id=%r, '
+                'created_at=%r, updated_at=%r)' % (
+                    self.user_id,
+                    self.questionnaire_id,
+                    self.created_at,
+                    self.updated_at,
+                ))
 
-class Exercise(Base):
+
+class Exercise(Base, CreatedUpdatedMixin):
     id = IDColumn()
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
@@ -243,8 +299,16 @@ class Exercise(Base):
         return results
 
     def __repr__(self):
-        return '<Exercise(title={}, description={})>'.format(self.title,
-                                                             self.description)
+        return ('Exercise(id=%r, description=%r, data=%r, author_id=%r, '
+                'created_at=%r, updated_at=%r)' % (
+                    self.id,
+                    self.title,
+                    self.description,
+                    self.data,
+                    self.author_id,
+                    self.created_at,
+                    self.updated_at,
+                ))
 
 
 # This is used for full text search. The application will be in
