@@ -28,6 +28,18 @@ class FlaskUrlField(fields.Field):
         return url_for(self.route, **url_args)
 
 
+class Nested(fields.Nested):
+    '''A nested subclass that checks the context if the nested element should
+    be expanded. And otherwise it should only serialize the href attribute.
+    '''
+
+    def _serialize(self, value, attr, obj):
+        parent_context = getattr(self.parent, 'context', {})
+        if attr not in parent_context.get('expand', ''):
+            self.only = 'href'
+        return super(Nested, self)._serialize(value, attr, obj)
+
+
 class SchemaOpts(_SchemaOpts):
     pass
     # def __init__(self, meta):
@@ -50,10 +62,13 @@ class ExerciseSchema(Schema):
     title = fields.Str(required=True)
     description = fields.Str(required=True)
     data = fields.Dict()
+    href = FlaskUrlField(route='v1.exercises',
+                         url_args={'id': 'id'},
+                         dump_only=True)
 
     class Meta:
         strict = True
-        additional = ('created_at', 'updated_at', 'last_login')
+        additional = ('created_at', 'updated_at')
         dump_only = ('created_at', 'updated_at')
 
 
@@ -61,9 +76,10 @@ class UserSchema(Schema):
     username = fields.Str(required=True)
     email = fields.Email(required=True)
     password = fields.Str(required=True, validate=validate.Length(min=8))
-    href = FlaskUrlField(route='api.users',
+    href = FlaskUrlField(route='v1.users',
                          url_args={'id': 'id'},
                          dump_only=True)
+    exercises = Nested('ExerciseSchema', many=True)
 
     class Meta:
         strict = True

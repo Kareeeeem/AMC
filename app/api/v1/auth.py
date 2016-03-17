@@ -50,4 +50,4 @@ def login():
         password=[PASSWORD]
     '''
     rv = g.user.login(db.session)
-    return rv, 303, location_header('api.users', id=g.user.id)
+    return rv, 303, location_header('.users', id=g.user.id)

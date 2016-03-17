@@ -299,8 +299,8 @@ class Exercise(Base, CreatedUpdatedMixin):
         return results
 
     def __repr__(self):
-        return ('Exercise(id=%r, description=%r, data=%r, author_id=%r, '
-                'created_at=%r, updated_at=%r)' % (
+        return ('Exercise(id=%r, title=%r, description=%r, data=%r, '
+                'author_id=%r, created_at=%r, updated_at=%r)' % (
                     self.id,
                     self.title,
                     self.description,

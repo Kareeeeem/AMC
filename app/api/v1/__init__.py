@@ -1,5 +1,5 @@
 from flask import Blueprint
 
-v1 = Blueprint('api', __name__)
+v1 = Blueprint('v1', __name__)
 
 from . import api, auth  # noqa

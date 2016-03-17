@@ -36,3 +36,9 @@ def users(id):
     schema = serializers.UserSchema()
     rv = schema.dump(user).data
     return rv
+
+
+@v1.route('/exercises')
+@v1.route('/exercises/<hashid:id>')
+def exercises(id=None):
+    return {}

@@ -58,3 +58,13 @@ def amisos(session):
         session.add(amisos)
     session.commit()
     yield amisos
+
+
+@pytest.yield_fixture(scope='function')
+def exercise(user, session):
+    exercise = models.Exercise(title='ex',
+                               description='ex desc',
+                               author=user)
+    session.add(exercise)
+    session.commit()
+    yield exercise
