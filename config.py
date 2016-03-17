@@ -63,9 +63,11 @@ class DevelopmentConfig(Config):
     HASHID_SALT = 'SaAaAalTy'
     BCRYPT_ROUNDS = 4
     SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URI')
+    SERVER_NAME = 'localhost:5000'
 
 
 class TestingConfig(DevelopmentConfig):
+    SQLALCHEMY_ECHO = False
     TESTING = True
     SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URI')
 
