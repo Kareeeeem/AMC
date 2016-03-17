@@ -4,8 +4,8 @@ import sys
 from scripts.cli import cli
 
 
-@cli.command('ishell', short_help='Runs an Ipython shell in the app context.')
-def shell_command():
+@cli.command(short_help='Runs an Ipython shell in the app context.')
+def ishell():
     """Runs an interactive IPython shell in the context of a given
     Flask application.  The application will populate the default
     namespace of this shell according to it's configuration.
