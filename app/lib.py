@@ -24,13 +24,6 @@ def location_header(route, **kwargs):
     return {'Location': url_for(route, **kwargs)}
 
 
-class FallbackError(Exception):
-    def __init__(self, cls, key, *args, **kwargs):
-        msg = "type object '{type}' has no fallback defined '{key}'.".format(
-            type=cls.__name__, key=key)
-        Exception.__init__(self, msg, *args, **kwargs)
-
-
 class ConfigDescriptor(object):
     '''A descriptor that attempts to get a value from the application config.
     '''
@@ -42,38 +35,36 @@ class ConfigDescriptor(object):
     def __get__(self, obj, type):
         try:
             return current_app.config.get(self.key)
-        except RuntimeError:
+        except RuntimeError as exc:
             if self.with_fallback:
                 return self.fallback
-            else:
-                raise FallbackError(type, self.key)
+            raise exc
 
 
 class with_app_config(object):
     '''Decorator that accepts any number of keys as arguments and makes those
     application config values available to the decorated class or function. In
-    the case of a class the config value is accesible as an attribute. In the
-    case of a function it is passed to as a keyword argument.
+    the case of a class the config value is accesible as an attribute (a
+    descriptor is placed on the class). In the case of a function it is passed
+    as a keyword argument.
 
     usage:
-        app.config['CONFIG_KEY'] = 'hi'
+        >>> app.config['CONFIG_KEY'] = 'hi'
 
-        @with_config('CONFIG_KEY')
-        def foo(CONFIG_KEY='bye'):
-            print CONFIG_KEY
+        >>> @with_config('CONFIG_KEY')
+        >>> def foo(CONFIG_KEY='bye'):
+        >>>    print CONFIG_KEY
 
         >>> foo()
         >>> 'hi'
 
-        app.config['CONFIG_KEY'] = 'hello'
-
-        @with_config['CONFIG_KEY']
-        class Foo(object):
-            CONFIG_KEY = 'greetings'
+        >>> @with_config['CONFIG_KEY']
+        >>> class Foo(object):
+        >>>     CONFIG_KEY = 'greetings'
 
         >>> f = Foo()
         >>> f.CONFIG_KEY
-        >>> 'hello'
+        >>> 'hi'
 
     When the the function or class is used outside of an application context
     it will use the default value if provided.
@@ -81,9 +72,9 @@ class with_app_config(object):
     def __init__(self, *keys):
         self.keys = keys
 
-    # If decorated is a class replace the attribute(s) with descriptor(s).
-    # This way wen use attribute access syntax (dot syntax) for both the
-    # Class and it's instance.
+    # If decorated is a class replace the attribute(s) with descriptor(s).  If
+    # the class defined it's own value for the config key save the original as
+    # a fallback
     def decorate_class(self, cls):
         for key in self.keys:
             with_fallback, fallback = False, None
@@ -109,12 +100,11 @@ class with_app_config(object):
             return f(*args, **kwargs)
         return wrapper
 
-    def __call__(self, decorated):
-        if inspect.isclass(decorated):
-            return self.decorate_class(decorated)
-
+    def __call__(self, f):
+        if inspect.isclass(f):
+            return self.decorate_class(f)
         else:
-            return self.decorate_function(decorated)
+            return self.decorate_function(f)
 
 
 class HandleJSONReponse(Response):
@@ -285,8 +275,9 @@ class Auth(object):
             username = form.get('username')
             password = form.get('password')
 
-            if not username or not password \
-                    or not self.verify_login_callback(username, password):
+            if (not username
+                    or not password
+                    or not self.verify_login_callback(username, password)):
                 raise AuthorizationError
 
             return f(*args, **kwargs)

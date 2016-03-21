@@ -1,6 +1,6 @@
 import pytest  # noqa
 
-from app.lib import with_app_config, FallbackError
+from app.lib import with_app_config
 
 
 # the tests inside the application context are here
@@ -28,12 +28,8 @@ def test_class_without_app_raises():
     class Foo(object):
         pass
 
-    with pytest.raises(FallbackError) as e:
-        def f():
-            Foo.KEY
-        f()
-    assert str(e.value) == "type object '{}' has no fallback defined '{}'.".format(
-        Foo.__name__, 'KEY')
+    with pytest.raises(RuntimeError):
+        Foo.KEY
 
 
 def test_class_instance_without_app_raises():
@@ -41,9 +37,5 @@ def test_class_instance_without_app_raises():
     class Foo(object):
         pass
 
-    with pytest.raises(FallbackError) as e:
-        def f():
-            Foo.KEY
-        f()
-    assert str(e.value) == "type object '{}' has no fallback defined '{}'.".format(
-        Foo.__name__, 'KEY')
+    with pytest.raises(RuntimeError):
+        Foo.KEY
