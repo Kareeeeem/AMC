@@ -1,16 +1,17 @@
-from flask import request, url_for
+from flask import request, abort, g
 from marshmallow import ValidationError
 
 from app import models, db, auth, serializers
+from app.lib import get_location_header
+from app.exceptions import AuthorizationError
 from . import v1
 
-GET, PUT, POST, DEL = 'GET', 'PUT', 'POST', 'DELETE'
+GET, PUT, POST, DELETE = 'GET', 'PUT', 'POST', 'DELETE'
 
 
 # USER ENDPOINTS
 # ==============
-# /users/registration                          POST   register with the app
-# /users                                       GET    retrieve all users
+# /users/                                      POST   register with the app
 # /users/<id>                                  GET    retrieve a single user
 # /users/<id>                                  PUT    edit user
 # /users/<id>                                  DELETE edit user
@@ -44,41 +45,107 @@ GET, PUT, POST, DEL = 'GET', 'PUT', 'POST', 'DELETE'
 # /questionnaires/<id>/responses/<response_id> PUT  edit response
 # /questionnaires/<id>/responses/<response_id> DELETE  delete response
 
+userschema = serializers.UserSchema(exclude=('password',))
+registerschema = serializers.UserSchema()
+exerciseschema = serializers.ExerciseSchema()
+
+
 @v1.errorhandler(ValidationError)
 def validation_error(exception=None):
-    return dict(errors=exception.messages), 400
+    if 'collisions' in exception.messages:
+        status_code = 409
+    else:
+        status_code = 400
+    return dict(errors=exception.messages), status_code
 
 
-@v1.route('/registration', methods=[POST])
+@v1.route('/users/', methods=[POST])
 def registration():
-    '''Entry point for registration.
-    '''
-    schema = serializers.UserSchema()
-    user_data = schema.load(request.get_json()).data
-
-    user = models.User(**user_data)
-    db.session.add(user)
-    db.session.commit()
-    rv = schema.dump(user).data
-    return rv, 201, {'Location': url_for('.users', id=user.id)}
+    '''Register a user.'''
+    json_data = request.get_json()
+    user_data = registerschema.load(json_data).data
+    user = models.User.create(db.session, user_data)
+    rv = userschema.dump(user).data
+    return rv, 201, get_location_header('.get_user', id=user.id)
 
 
-@v1.route('/users/<hashid:id>')
-@auth.token_required
-def users(id):
+@v1.route('/users/<hashid:id>', methods=[GET])
+def get_user(id):
+    '''Get a single user profile. '''
     user = models.User.query.get(id)
-    schema = serializers.UserSchema()
-    rv = schema.dump(user).data
+    if not user:
+        abort(404)
+
+    rv = userschema.dump(user).data
     return rv
 
 
-@v1.route('/users/<hashid:id>/exercises')
-def user_exercises(id):
-    '''All exercises authored by user.'''
-    return {}
+@v1.route('/users/<hashid:id>', methods=[PUT])
+@auth.token_required
+def put_user(id):
+    '''Update a user.'''
+    user = models.User.query.get(id)
+    if not user:
+        abort(404)
+
+    elif user.id != g.current_user.id:
+        raise AuthorizationError
+
+    # Make the schema validator know about the user to be updated for
+    # validating unique columns. A colission with 'self' is of course not a
+    # collision.
+    userschema.context = dict(id=user.id)
+    json_data = request.get_json()
+    user_data = userschema.load(json_data).data
+    user.update(db.session, user_data)
+    return userschema.dump(user).data
 
 
-@v1.route('/exercises')
-@v1.route('/exercises/<hashid:id>')
-def exercises(id=None):
-    return {}
+@v1.route('/users/<hashid:id>', methods=[DELETE])
+@auth.token_required
+def delete_user(id):
+    '''Delete a user.'''
+    user = models.User.query.get(id)
+    if not user:
+        abort(404)
+
+    elif user.id != g.current_user.id:
+        raise AuthorizationError
+
+    user.delete(db.session)
+    return {}, 204
+
+
+@v1.route('/users/<hashid:id>/exercises', methods=[GET])
+def get_user_exercises(id):
+    '''Get collection of exercises authored by user.'''
+    user = models.User.query.get(id)
+    if not user:
+        abort(404)
+    return dict(data=exerciseschema.dump(user.exercises, many=True).data)
+
+
+@v1.route('/exercises', methods=[GET])
+def get_exercises():
+    '''Get exercise collection.'''
+    query = models.Exercise.query
+    # TODO filter based on query params
+    exercises = query.all()
+    return dict(data=exerciseschema.dump(exercises, many=True).data)
+
+
+@v1.route('/exercises<hashid:id>', methods=[GET])
+def get_exercise(id):
+    '''Get an exercise.'''
+    exercise = models.Exercise.query.get(id)
+    if not exercise:
+        abort(404)
+    return exerciseschema.dump(exercise).data
+
+
+# @v1.route('/exercises<hashid:id>', methods=[PUT, DELETE])
+# def get_exercise(id):
+#     exercise = models.Exercise.query.get(id)
+#     if not exercise:
+#         abort(404)
+#     return exerciseschema.dump(exercise).data

@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     DDL,
     event,
+    Float,
     ForeignKey,
     ForeignKeyConstraint,
     func,
@@ -20,14 +21,14 @@ from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship, backref
 
 from meta.orm import db
-from meta.mixins import TokenMixin, CreatedUpdatedMixin
+from meta.mixins import TokenMixin, CreatedUpdatedMixin, CRUDMixin
 from meta.columns import IDColumn, PasswordColumn
 
 ID_TYPE = Integer
 Base = db.Base
 
 
-class User(Base, TokenMixin, CreatedUpdatedMixin):
+class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
     id = IDColumn()
     password = PasswordColumn()
 
@@ -45,6 +46,21 @@ class User(Base, TokenMixin, CreatedUpdatedMixin):
         cascade='all, delete-orphan',
         passive_deletes=True,
         order_by='QuestionnaireResponse.created_at',
+    )
+
+    exercise_collection = relationship(
+        'ExerciseCollection',
+        backref='user',
+        collection_class=ordering_list('ordinal'),
+        cascade='all, delete-orphan',
+        passive_deletes=True,
+    )
+
+    rating = relationship(
+        'Rating',
+        backref='user',
+        cascade='all, delete-orphan',
+        passive_deletes=True,
     )
 
     def login(self, session):
@@ -72,6 +88,28 @@ class User(Base, TokenMixin, CreatedUpdatedMixin):
                     self.last_login,
                     self.password,
                 ))
+
+
+class ExerciseCollection(Base):
+    user_id = Column(ID_TYPE,
+                     ForeignKey('user.id', ondelete='CASCADE'),
+                     primary_key=True)
+    exercise_id = Column(ID_TYPE,
+                         ForeignKey('exercise.id', ondelete='CASCADE'),
+                         primary_key=True)
+    ordinal = Column(Integer)
+    exercise = relationship('Exercise', passive_deletes=True)
+
+
+class Rating(Base):
+    user_id = Column(ID_TYPE,
+                     ForeignKey('user.id', ondelete='CASCADE'),
+                     primary_key=True)
+    exercise_id = Column(ID_TYPE,
+                         ForeignKey('exercise.id', ondelete='CASCADE'),
+                         primary_key=True)
+    exercise = relationship('Exercise', passive_deletes=True)
+    rating = Column(Float, nullable=False)
 
 
 class Questionnaire(Base):

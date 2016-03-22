@@ -2,7 +2,7 @@ from flask import g
 from sqlalchemy import or_
 
 from app import auth, db, models
-from app.lib import location_header
+from app.lib import get_location_header
 
 from . import v1
 
@@ -14,6 +14,7 @@ def verify_token(token):
     data = models.User.verify_auth_token(token)
     if data:
         g.claims = data
+        g.current_user = models.User.query.get(data['id'])
         return True
 
 
@@ -50,4 +51,4 @@ def login():
         password=[PASSWORD]
     '''
     rv = g.user.login(db.session)
-    return rv, 303, location_header('.users', id=g.user.id)
+    return rv, 303, get_location_header('.get_user', id=g.user.id)

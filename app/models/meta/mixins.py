@@ -37,3 +37,40 @@ class TokenMixin(object):
             return s.loads(token)
         except (SignatureExpired, BadSignature):
             return None
+
+
+class CRUDMixin(object):
+    '''A mixin that provides some helper and proxy functions for easy object
+    creation and updating with validation.
+    '''
+    @classmethod
+    def create(cls, session, data, commit=True):
+        '''Create an instance from a dictionary
+        :param bool commit: a boolean stating wether to commit at the end.
+        '''
+        instance = cls(**data)
+        return instance.save(session, commit=commit)
+
+    def update(self, session, data, commit=True):
+        '''Update an instance from a dictionary
+        :param bool commit: a boolean stating wether to commit at the end
+        '''
+        for k, v in data.iteritems():
+            setattr(self, k, v)
+        return commit and self.save(session, commit=commit) or self
+
+    def save(self, session, commit=True):
+        '''Save an instance to the database.
+        :param bool commit: a boolean stating wether to commit at the end.
+        '''
+        session.add(self)
+        if commit:
+            session.commit()
+        return self
+
+    def delete(self, session, commit=True):
+        '''Delete an instance from the database.
+        :param bool commit: a boolean stating wether to commit at the end.
+        '''
+        session.delete(self)
+        return commit and session.commit()

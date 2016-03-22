@@ -4,8 +4,44 @@ from marshmallow import (
     SchemaOpts as _SchemaOpts,
     fields,
     validate,
-    # post_dump,
+    ValidationError,
+    validates_schema
 )
+from sqlalchemy import or_
+
+from app import models
+
+
+def validate_unique(schema, data, model):
+    '''Check whether a row already exists in the database with one or more
+    key(column), value pairs from the provided data dictionary.
+    :param schema: The schema instance that is calling the validator.
+    :param data: the dictionary with data to validate.
+    :param model: the model to validate
+    '''
+    unique_columns = [c.key for c in model.__table__.columns if c.unique]
+    conditions = [getattr(model, column) == data.get(column)
+                  for column in unique_columns
+                  if data.get(column)]
+
+    id = schema.context.get('id', None)
+
+    if conditions:
+        or_clause = or_(*conditions)
+        q = model.query.filter(or_clause)
+
+        if id is not None:
+            q = q.filter(model.id != id)
+
+        objects = q.all()
+
+        errors = {column: '{} is already in use.'.format(column.title())
+                  for column in unique_columns
+                  for object_ in objects
+                  if getattr(object_, column) == data.get(column)}
+
+        if errors:
+            raise ValidationError(errors, 'collisions')
 
 
 def get_url_arguments_from_obj(obj, **kwargs):
@@ -13,7 +49,7 @@ def get_url_arguments_from_obj(obj, **kwargs):
 
 
 def generate_url(route, **kwargs):
-    return url_for(route, **kwargs)
+    return url_for(route, _external=True, **kwargs)
 
 
 class FlaskUrlField(fields.Field):
@@ -69,29 +105,22 @@ class ExpandableNested(fields.Nested):
         return super(ExpandableNested, self)._serialize(value, attr, obj)
 
 
+# TODO post dump logic such as wrapping, pagination data, etc.
 class SchemaOpts(_SchemaOpts):
-    pass
-    # def __init__(self, meta):
-    #     _SchemaOpts.__init__(self, meta)
-    #     self.route = getattr(meta, 'route', None)
+    def __init__(self, meta):
+        _SchemaOpts.__init__(self, meta)
 
 
+# TODO post dump logic such as wrapping, pagination data, etc.
 class Schema(_Schema):
-    pass
-    # OPTIONS_CLASS = SchemaOpts
-
-    # @post_dump(pass_original=True)
-    # def add_href(self, data, original):
-    #     if self.opts.route:
-    #         data['href'] = url_for(self.opts.route, id=original.id)
-    #         return data
+    OPTIONS_CLASS = SchemaOpts
 
 
 class ExerciseSchema(Schema):
     title = fields.Str(required=True)
     description = fields.Str(required=True)
     data = fields.Dict()
-    href = FlaskUrlField(route='v1.exercises',
+    href = FlaskUrlField(route='v1.get_exercise',
                          route_args={'id': 'id'},
                          dump_only=True)
     author = ExpandableNested('UserSchema', exclude=('exercises',))
@@ -106,19 +135,23 @@ class UserSchema(Schema):
     username = fields.Str(required=True)
     email = fields.Email(required=True)
     password = fields.Str(required=True, validate=validate.Length(min=8))
-    href = FlaskUrlField(route='v1.users',
+    href = FlaskUrlField(route='v1.get_user',
                          route_args={'id': 'id'},
                          dump_only=True)
     exercises = ExpandableNested('ExerciseSchema',
-                                 collection_route='v1.user_exercises',
+                                 collection_route='v1.get_user_exercises',
                                  collection_route_args={'id': 'id'},
                                  exclude=('author',),
                                  dump_only=True,
                                  many=True,
                                  )
 
+    @validates_schema
+    def validate(self, data):
+        return validate_unique(self, data, models.User)
+
     class Meta:
         strict = True
-        additional = ('created_at', 'updated_at', 'last_login')
         load_only = ('password',)
-        dump_only = ('created_at', 'updated_at')
+        additional = ('created_at', 'updated_at', 'last_login')
+        dump_only = ('created_at', 'updated_at', 'last_login')

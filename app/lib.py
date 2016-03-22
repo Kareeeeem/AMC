@@ -16,9 +16,10 @@ from flask import (
     url_for,
 )
 from werkzeug.routing import BaseConverter
+from app.exceptions import AuthorizationError
 
 
-def location_header(route, **kwargs):
+def get_location_header(route, **kwargs):
     '''Return a location header.
     '''
     return {'Location': url_for(route, **kwargs)}
@@ -218,17 +219,6 @@ class HashIDConverter(BaseConverter):
         return HashIDConverter_
 
 
-class AuthorizationError(Exception):
-    def __init__(self, msg=None, status_code=401, *args, **kwargs):
-        self.msg = msg or "Unauthorized request"
-        self.status_code = status_code
-        self.response = dict(status=self.status_code, message=self.msg)
-        Exception.__init__(self, msg, *args, **kwargs)
-
-    def __str__(self):
-        return repr(self.msg)
-
-
 class Auth(object):
     '''AUthorization class that manages and OAuth authorization flow following
     https://stormpath.com/blog/the-ultimate-guide-to-mobile-api-security/.
@@ -246,7 +236,7 @@ class Auth(object):
         '''
         @app.errorhandler(AuthorizationError)
         def unauthorized(exception):
-            return exception.response, exception.status_code
+            return dict(errors=exception.response), exception.status_code
 
     def verify_token(self, f):
         '''Registers a callback to be run to validate the token. The callback
