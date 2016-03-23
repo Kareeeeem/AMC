@@ -22,24 +22,34 @@ def parse_rv(rv):
 
 
 def serialize(serializer, many=False, update_id=None, load=True, dump=True):
+    '''Decorator that takes care of (de)serializing and validating incoming and
+    outgoing data.
+    '''
     def wrapper(f):
         @functools.wraps(f)
         def wrapped(*args, **kwargs):
+            # Sometimes the schema or it's validators want to know about
+            # query params for expanding resources, pagination info, etc.
             serializer.context = dict(**request.args)
+
             if load:
                 if update_id:
+                    # We let the schema know about the object we are updating
+                    # so it will not check for collisions against itself when
+                    # validating for uniqueness.
                     id = request.view_args[update_id]
-                    serializer.context.update(dict(id=id))
+                    serializer.context.update(dict(update_id=id))
+
                 json_data = request.get_json()
+                # Place the parsed json on the g request global.
                 g.json = serializer.load(json_data, many=many).data
 
             rv = f(*args, **kwargs)
 
             if dump:
                 rv, status_or_headers, headers = parse_rv(rv)
-                rv = (serializer.dump(rv, many=many).data,
-                      status_or_headers,
-                      headers)
+                dumped_rv = serializer.dump(rv, many=many).data
+                rv = dumped_rv, status_or_headers, headers
             return rv
         return wrapped
     return wrapper
