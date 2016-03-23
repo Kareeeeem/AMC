@@ -57,7 +57,6 @@ class Config(object):
 
 
 class DevelopmentConfig(Config):
-    SQLALCHEMY_ECHO = True
     DEBUG = True
     SECRET_KEY = 'seekrit'
     HASHID_SALT = 'SaAaAalTy'
@@ -67,7 +66,6 @@ class DevelopmentConfig(Config):
 
 
 class TestingConfig(DevelopmentConfig):
-    SQLALCHEMY_ECHO = False
     TESTING = True
     SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URI')
 

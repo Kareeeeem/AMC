@@ -41,7 +41,7 @@ def validate_unique(schema, data, model):
                   if getattr(object_, column) == data.get(column)}
 
         if errors:
-            raise ValidationError(errors, 'collisions')
+            raise ValidationError(errors, 'conflicts')
 
 
 def get_url_arguments_from_obj(obj, **kwargs):

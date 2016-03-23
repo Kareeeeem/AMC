@@ -53,7 +53,7 @@ def test_put_other_user(app, session):
 
     with app.test_client() as client:
         rv = client.put(resp2.headers['Location'],
-                        data=json.dumps({}),
+                        data=json.dumps(dict(username='x', email='h@h.nl')),
                         content_type='application/json',
                         headers=dict(Authorization='Bearer {}'.format(jwt))
                         )
