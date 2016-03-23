@@ -1,5 +1,3 @@
-import functools
-
 from flask import request, abort, g
 
 from app import models, db, auth, serializers
@@ -8,51 +6,6 @@ from app.exceptions import AuthorizationError
 from . import v1
 
 GET, PUT, POST, DELETE = 'GET', 'PUT', 'POST', 'DELETE'
-
-
-def parse_rv(rv):
-    '''Takes a value and returns a length 3 tuple. The resulting tuple is
-    padded with None types if the input variable is other than a tuple or the
-    input value is a tuple with a length less than 3.
-    '''
-    if isinstance(rv, tuple):
-        return rv + (None,) * (3 - len(rv))
-    else:
-        return rv, None, None
-
-
-def serialize(serializer, many=False, update_id=None, load=True, dump=True):
-    '''Decorator that takes care of (de)serializing and validating incoming and
-    outgoing data.
-    '''
-    def wrapper(f):
-        @functools.wraps(f)
-        def wrapped(*args, **kwargs):
-            # Sometimes the schema or it's validators want to know about
-            # query params for expanding resources, pagination info, etc.
-            serializer.context = dict(**request.args)
-
-            if load:
-                if update_id:
-                    # We let the schema know about the object we are updating
-                    # so it will not check for collisions against itself when
-                    # validating for uniqueness.
-                    id = request.view_args[update_id]
-                    serializer.context.update(dict(update_id=id))
-
-                json_data = request.get_json()
-                # Place the parsed json on the g request global.
-                g.json = serializer.load(json_data, many=many).data
-
-            rv = f(*args, **kwargs)
-
-            if dump:
-                rv, status_or_headers, headers = parse_rv(rv)
-                dumped_rv = serializer.dump(rv, many=many).data
-                rv = dumped_rv, status_or_headers, headers
-            return rv
-        return wrapped
-    return wrapper
 
 
 # USER ENDPOINTS
@@ -66,7 +19,7 @@ def serialize(serializer, many=False, update_id=None, load=True, dump=True):
 # /users/<id>/responses                        GET    retreive all responses authored by user
 
 
-@v1.route('/users/', methods=[POST])
+@v1.route('/users', methods=[POST])
 def registration():
     '''Register a user.'''
     registerschema = serializers.UserSchema()
@@ -79,7 +32,7 @@ def registration():
     return rv, 201, get_location_header('.get_user', id=user.id)
 
 
-@v1.route('/users/', methods=[GET])
+@v1.route('/users', methods=[GET])
 def get_users():
     '''Register a user.'''
     users = models.User.query.all()

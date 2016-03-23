@@ -31,7 +31,7 @@ def validate_unique(schema, data, model):
                   if data.get(column)]
 
     # this is the id of the existing object, if it is passed.
-    update_id = schema.context.get('id', None)
+    update_id = schema.context.get('update_id', None)
 
     if conditions:
         # We want to filter the conditions with the 'OR' SQL operator.

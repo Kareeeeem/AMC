@@ -16,7 +16,7 @@ user_data2 = dict(
 
 def register(app, **kwargs):
     with app.test_client() as client:
-        rv = client.post('/v1/users/',
+        rv = client.post('/v1/users',
                          data=json.dumps(kwargs),
                          content_type='application/json',
                          )
