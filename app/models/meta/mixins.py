@@ -28,7 +28,7 @@ class TokenMixin(object):
 
         return dict(access_token=s.dumps(payload),
                     expires_in=expiration,
-                    token_type='bearer')
+                    token_type='Bearer')
 
     @classmethod
     def verify_auth_token(cls, token):

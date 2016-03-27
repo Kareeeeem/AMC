@@ -1,4 +1,5 @@
 # import sys
+import random
 import os
 import json
 
@@ -12,6 +13,26 @@ from scripts.cli import cli
 def get_db_and_models():
     from app import db, models
     return db, models
+
+
+def generate_users():
+    db, models = get_db_and_models()
+    users = [models.User(username='user%s' % i,
+                         email='email%s@gmail.com' % i,
+                         password='00000000'
+                         ) for i in xrange(100)]
+    db.session.add_all(users)
+    return users
+
+
+def generate_exercises(users):
+    db, models = get_db_and_models()
+    exercises = [models.Exercise(title='title%s' % i,
+                                 description='desc%s' % i,
+                                 author=random.choice(users),
+                                 ) for i in xrange(1000)]
+    db.session.add_all(exercises)
+    return exercises
 
 
 @cli.group(chain=True)
@@ -44,25 +65,14 @@ def create(ctx, d):
 @click.pass_obj
 def fill(obj):
     db, models = get_db_and_models()
-    user = models.User(username='kareem',
-                       email='kareeeeem@gmail.com',
-                       password='0000')
-    db.session.add(user)
-    db.session.add(models.Exercise(title='first',
-                                   description='first desc',
-                                   author=user))
+    users = generate_users()
+    generate_exercises(users)
 
     basedir = os.path.abspath(os.path.dirname(__file__))
     with open(os.path.join(basedir, 'amisos.json')) as amisos_json:
         data = json.load(amisos_json)
         amisos = models.Questionnaire(**data)
         db.session.add(amisos)
-
-    exercise = models.Exercise(
-        title='een nieuwe oefening',
-        description='deze oefening is behulpzaam voor het onderhouden van uw mentale gezondheid. dit is bewezen door studies.')
-
-    db.session.add(exercise)
 
     db.session.commit()
 

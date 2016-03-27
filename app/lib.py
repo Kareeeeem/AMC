@@ -4,9 +4,9 @@ import fractions
 import functools
 import inspect
 import random
+import math
 
 import hashids
-
 from flask import (
     abort,
     current_app,
@@ -17,7 +17,77 @@ from flask import (
     url_for,
 )
 from werkzeug.routing import BaseConverter
-from app.exceptions import AuthorizationError
+
+from app.exceptions import AuthorizationError, PaginationError
+
+
+def parse_query_params(params):
+    '''url query params might be given as such: ?expand=param1&expand=param2.
+    or as such: ?expand=param1,param2. Or even as a combination of the two.
+    Werkzeug saves these params in a multidict. So when ask for
+    request.args.getlist('expand'). We might get something like this.
+
+    >>> params = ['one', 'two', 'two', 'tree,four']
+
+    To support this mixed case scenario we first join everything with a comma.
+    And then split it.
+
+    >>> parse_query_params(params)
+    ['one', 'two', 'tree', 'four']
+    '''
+
+    raw_params = params.getlist('expand')
+    return ','.join(raw_params).split(',')
+
+
+class Pagination(object):
+    def __init__(self, request, count):
+        # the query_params multidict is immutable so make a copy of it.
+        self.query_params = request.args.copy()
+        self.view_args = request.view_args
+        self.endpoint = request.url_rule.endpoint
+
+        # pop the original pagination params and save them.
+        self.page = int(self.query_params.pop('page', 1))
+        self.per_page = int(self.query_params.pop('per_page', 10))
+        self.total_count = count
+
+        if self.page < 1 or self.page > self.pages or self.per_page > 100:
+            raise PaginationError(self.page, self.pages, self.per_page)
+
+        self.current_page_url = self.generate_url(page=self.page, per_page=self.per_page)
+        self.first_page_url = self.generate_url(page=1, per_page=self.per_page)
+        self.last_page_url = self.generate_url(page=self.pages, per_page=self.per_page)
+
+    def generate_url(self, **pagination_params):
+        param_dicts = (pagination_params,
+                       self.view_args,
+                       self.query_params.to_dict(flat=False))
+        # combine all these dicts
+        params = reduce(lambda a, b: dict(a, **b), param_dicts)
+        return url_for(self.endpoint, _external=True, **params)
+
+    @property
+    def pages(self):
+        return int(math.ceil(self.total_count / float(self.per_page)))
+
+    @property
+    def prev_page_url(self):
+        if self.page > 1:
+            return self.generate_url(page=self.page - 1, per_page=self.per_page)
+
+    @property
+    def next_page_url(self):
+        if self.page < self.pages:
+            return self.generate_url(page=self.page + 1, per_page=self.per_page)
+
+    @property
+    def limit(self):
+        return self.per_page
+
+    @property
+    def offset(self):
+        return (self.page - 1) * self.per_page
 
 
 def parse_rv(rv):
@@ -96,22 +166,22 @@ class with_app_config(object):
     as a keyword argument.
 
     usage:
-        >>> app.config['CONFIG_KEY'] = 'hi'
+    >>> app.config['CONFIG_KEY'] = 'hi'
 
-        >>> @with_config('CONFIG_KEY')
-        >>> def foo(CONFIG_KEY='bye'):
-        >>>    print CONFIG_KEY
+    >>> @with_config('CONFIG_KEY')
+    >>> def foo(CONFIG_KEY='bye'):
+    >>>    print CONFIG_KEY
 
-        >>> foo()
-        >>> 'hi'
+    >>> foo()
+    >>> 'hi'
 
-        >>> @with_config['CONFIG_KEY']
-        >>> class Foo(object):
-        >>>     CONFIG_KEY = 'greetings'
+    >>> @with_config['CONFIG_KEY']
+    >>> class Foo(object):
+    >>>     CONFIG_KEY = 'greetings'
 
-        >>> f = Foo()
-        >>> f.CONFIG_KEY
-        >>> 'hi'
+    >>> f = Foo()
+    >>> f.CONFIG_KEY
+    >>> 'hi'
 
     When the the function or class is used outside of an application context
     it will use the default value if provided.
@@ -247,7 +317,7 @@ class HashIDConverter(BaseConverter):
         return hashids.Hashids(salt=self.SALT)
 
     def to_python(self, value):
-        return self.hashid.decode(value) or abort(404)
+        return self.hashid.decode(value)[0] or abort(404)
 
     def to_url(self, value):
         return self.hashid.encode(value)
@@ -266,8 +336,9 @@ class HashIDConverter(BaseConverter):
 
 
 class Auth(object):
-    '''AUthorization class that manages and OAuth authorization flow following
-    https://stormpath.com/blog/the-ultimate-guide-to-mobile-api-security/.
+    '''AUthorization class that manages an OAuth authorization flow following
+    this guide:
+    https://stormpath.com/blog/the-ultimate-guide-to-mobile-api-security/
     '''
     def __init__(self, app=None):
         self.verify_token_callback = None
@@ -299,7 +370,8 @@ class Auth(object):
         return f
 
     def login_required(self, f):
-        '''Decorate a route with this function to mark it as login required.
+        '''Decorate a route with this to require a username/email
+        password combination in a form.
         '''
         @functools.wraps(f)
         def wrapper(*args, **kwargs):
@@ -320,7 +392,7 @@ class Auth(object):
         return wrapper
 
     def token_required(self, f):
-        '''Decorate a route with this function to mark it as token required.
+        '''Decorate a route with this to require a token
         '''
         # https://github.com/miguelgrinberg/Flask-HTTPAuth/blob/master/flask_httpauth.py#L51-L55
         @functools.wraps(f)

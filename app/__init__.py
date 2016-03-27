@@ -7,6 +7,9 @@ from models import db
 auth = lib.Auth()
 
 
+# TODO consistent error responses
+
+
 def create_app(config_name='default'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
@@ -26,7 +29,7 @@ def create_app(config_name='default'):
 
     @app.errorhandler(404)
     def not_found_error(exception=None):
-        error = dict(status_code=404, message='Resource not found')
+        error = dict(status_code=404, messages='Resource not found')
         return dict(errors=error), error['status_code']
 
     return app

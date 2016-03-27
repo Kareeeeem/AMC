@@ -5,7 +5,9 @@ from marshmallow import (
     fields,
     validate,
     ValidationError,
-    validates_schema
+    validates_schema,
+    # pre_dump,
+    post_dump,
 )
 from sqlalchemy import or_
 
@@ -69,6 +71,7 @@ class FlaskUrlField(fields.Field):
     attributes that provide the value of said arguments.
     '''
 
+    # This attribute is not pulled from the object.
     _CHECK_ATTRIBUTE = False
 
     def __init__(self, route, route_args=None, *args, **kwargs):
@@ -94,8 +97,7 @@ class ExpandableNested(fields.Nested):
         self.collection_route_args = collection_route_args or {}
 
     def _serialize(self, value, attr, obj):
-        parent_context = getattr(self.parent, 'context', {})
-        expand = bool(attr in parent_context.get('expand', ''))
+        expand = bool(attr in self.parent.expand)
 
         if self.many and not expand:
             # return the collection route, no needs to serialize anything from
@@ -118,11 +120,24 @@ class ExpandableNested(fields.Nested):
 class SchemaOpts(_SchemaOpts):
     def __init__(self, meta):
         _SchemaOpts.__init__(self, meta)
+        self.strict = True
 
 
 # TODO post dump logic such as wrapping, pagination data, etc.
 class Schema(_Schema):
     OPTIONS_CLASS = SchemaOpts
+
+    def __init__(self, page=None, expand=None, *args, **kwargs):
+        super(Schema, self).__init__(*args, **kwargs)
+        self.expand = expand or []
+        self.page = page
+
+    @post_dump(pass_many=True)
+    def wrap_in_pagination(self, data, many):
+        if many and self.page:
+            page = PaginationSchema().dump(self.page).data
+            page.update(items=data)
+            return dict(data=page)
 
 
 class ExerciseSchema(Schema):
@@ -135,7 +150,6 @@ class ExerciseSchema(Schema):
     author = ExpandableNested('UserSchema', exclude=('exercises',))
 
     class Meta:
-        strict = True
         additional = ('created_at', 'updated_at')
         dump_only = ('created_at', 'updated_at')
 
@@ -160,7 +174,19 @@ class UserSchema(Schema):
         return validate_unique(self, data, models.User)
 
     class Meta:
-        strict = True
         load_only = ('password',)
         additional = ('created_at', 'updated_at', 'last_login')
         dump_only = ('created_at', 'updated_at', 'last_login')
+
+
+class PaginationSchema(Schema):
+    page = fields.Integer()
+    pages = fields.Integer()
+    per_page = fields.Integer()
+
+    total = fields.Integer(attribute='total_count')
+    next = fields.Url(attribute='next_page_url')
+    prev = fields.Url(attribute='prev_page_url')
+    first = fields.Url(attribute='first_page_url')
+    last = fields.Url(attribute='last_page_url')
+    current = fields.Url(attribute='current_page_url')

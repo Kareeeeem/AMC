@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime, timedelta
 
 from psycopg2.extras import NumericRange
 from sqlalchemy import (
@@ -38,7 +38,8 @@ class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
 
     exercises = relationship(
         'Exercise',
-        backref=backref('author', lazy='joined')
+        # lazy='dynamic',
+        backref=backref('author', lazy='joined'),
     )
 
     questionnaire_responses = relationship(
@@ -50,7 +51,6 @@ class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
 
     exercise_collection = relationship(
         'ExerciseCollection',
-        backref='user',
         collection_class=ordering_list('ordinal'),
         cascade='all, delete-orphan',
         passive_deletes=True,
@@ -64,7 +64,7 @@ class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
     )
 
     def login(self, session):
-        self.last_login = datetime.datetime.utcnow()
+        self.last_login = datetime.utcnow()
         db.session.commit()
         rv = self.generate_auth_token()
         return rv
@@ -98,7 +98,7 @@ class ExerciseCollection(Base):
                          ForeignKey('exercise.id', ondelete='CASCADE'),
                          primary_key=True)
     ordinal = Column(Integer)
-    exercise = relationship('Exercise', passive_deletes=True)
+    exercise = relationship('Exercise', passive_deletes=True, lazy='joined')
 
 
 class Rating(Base):
@@ -108,7 +108,7 @@ class Rating(Base):
     exercise_id = Column(ID_TYPE,
                          ForeignKey('exercise.id', ondelete='CASCADE'),
                          primary_key=True)
-    exercise = relationship('Exercise', passive_deletes=True)
+    exercise = relationship('Exercise', passive_deletes=True, lazy='joined')
     rating = Column(Float, nullable=False)
 
 
@@ -317,6 +317,8 @@ where(Choice.response_id == QuestionnaireResponse.id).as_scalar(), Integer)))
 
 
 class Exercise(Base, CreatedUpdatedMixin):
+    MAX_EDIT_TIME = timedelta(hours=3)
+
     id = IDColumn()
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
@@ -327,14 +329,24 @@ class Exercise(Base, CreatedUpdatedMixin):
     __table_args__ = Index('ix_exercise_tsv', 'tsv', postgresql_using='gin'),
 
     @classmethod
-    def search(cls, session, query, limit=50, offset=0):
-        results = session.query(cls).\
-            filter(Exercise.tsv.match(query)).\
-            order_by(func.ts_rank(cls.tsv, func.to_tsquery(query)).desc()).\
-            limit(limit).\
-            offset(offset).\
-            all()
-        return results
+    def search(cls, search_terms, query=None):
+        # TODO support more complex queries
+        # only support AND queries for now
+        search_terms = (' & ').join(search_terms.split())
+
+        if not query:
+            query = cls.query
+
+        query = query.filter(cls.tsv.match(search_terms)).\
+            order_by(func.ts_rank(cls.tsv, func.to_tsquery(search_terms)).desc())
+
+        return query
+
+    def allow_edit(self, datetime_=None):
+        '''Only allow edits if exercise is no older than MAX_EDIT_TIME.'''
+        if not datetime_:
+            datetime_ = datetime.utcnow()
+        return (datetime_ - self.created_at) < self.MAX_EDIT_TIME
 
     def __repr__(self):
         return ('Exercise(id=%r, title=%r, description=%r, data=%r, '
