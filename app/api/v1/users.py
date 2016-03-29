@@ -1,14 +1,11 @@
-from flask import request, abort
+from flask import request
 
 from app import auth, db
 from app.exceptions import AuthorizationError, PaginationError
 from app.models import User, Exercise, UserFavoriteExercise
-from app.serializers import UserSchema, ExerciseSchema
-from app.lib import (
-    get_location_header,
-    Pagination,
-    parse_query_params,
-)
+from app.serializers import UserSchema, ExerciseSchema, IDSchema
+from app.lib import get_location_header, Pagination, parse_query_params, get_or_404
+
 
 from . import v1
 
@@ -52,10 +49,7 @@ def get_users():
 @v1.route('/users/<hashid:id>', methods=['GET'])
 def get_user(id):
     '''Get a single user. '''
-    user = User.query.get(id)
-    if not user:
-        abort(404)
-
+    user = get_or_404(User, id)
     userschema = UserSchema(expand=parse_query_params(request.args))
     return userschema.dump(user).data
 
@@ -72,11 +66,9 @@ def get_profile():
 @auth.token_required
 def put_user(id):
     '''Update a user.'''
-    user = User.query.get(id)
-    if not user:
-        abort(404)
+    user = get_or_404(User, id)
 
-    elif user.id != auth.current_user.id:
+    if user.id != auth.current_user.id:
         raise AuthorizationError
 
     schema = UserSchema(exclude=('password',))
@@ -93,25 +85,17 @@ def put_user(id):
 @auth.token_required
 def delete_user(id):
     '''Delete a user.'''
-    user = User.query.get(id)
-    if not user:
-        abort(404)
-
-    elif user.id != auth.current_user.id:
+    if id != auth.current_user.id:
         raise AuthorizationError
 
-    user.delete(db.session)
+    auth.current_user.delete(db.session)
     return {}, 204
 
 
 @v1.route('/users/<hashid:id>/exercises', methods=['GET'])
 def get_user_exercises(id):
     '''Get collection of exercises authored by user.'''
-    user = User.query.get(id)
-    if not user:
-        abort(404)
-
-    query = Exercise.query.filter(Exercise.author_id == user.id)
+    query = Exercise.query.filter(Exercise.author_id == id)
     page = Pagination(request, query.count())
     exercises = query.offset(page.offset).limit(page.limit).all()
     schema = ExerciseSchema(page=page, expand=parse_query_params(request.args))
@@ -122,6 +106,9 @@ def get_user_exercises(id):
 @auth.token_required
 def get_user_favorites(id):
     '''Get collection of exercises authored by user.'''
+    if auth.current_user.id != id:
+        raise AuthorizationError
+
     query = Exercise.query.\
         join(UserFavoriteExercise).\
         filter(UserFavoriteExercise.user_id == auth.current_user.id).\
@@ -131,3 +118,17 @@ def get_user_favorites(id):
     exercises = query.offset(page.offset).limit(page.limit).all()
     schema = ExerciseSchema(page=page, expand=parse_query_params(request.args))
     return schema.dump(exercises, many=True).data
+
+
+@v1.route('/users/<hashid:id>/favorites', methods=['POST'])
+@auth.token_required
+def add_to_favorites(id):
+    '''Add an exercise to favorites.'''
+    if auth.current_user.id != id:
+        raise AuthorizationError
+
+    exercise_id = IDSchema().load(request.get_json()).data
+    exercise = get_or_404(Exercise, exercise_id)
+    auth.current_user.favorite_exercises.append(exercise)
+    db.session.commit()
+    return {}, 204

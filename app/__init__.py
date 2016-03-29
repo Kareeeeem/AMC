@@ -5,6 +5,7 @@ from config import config
 from models import db
 
 auth = lib.Auth()
+hashid = lib.HashID()
 
 
 # TODO consistent error responses
@@ -17,9 +18,7 @@ def create_app(config_name='default'):
 
     config[config_name].init_loggers(app)
 
-    hashid = lib.HashIDConverter.with_salt(app.config.get('HASHID_SALT', ''))
-    app.url_map.converters['hashid'] = hashid
-
+    hashid.init_app(app)
     db.init_app(app)
     auth.init_app(app)
 

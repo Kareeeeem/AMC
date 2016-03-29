@@ -304,42 +304,45 @@ class IntEncoder(object):
             return x % modulus
 
 
-class HashIDConverter(BaseConverter):
+class HashID(object):
     '''A converter for use with Flask that encodes and decodes an
-    integer value.
+    integer value. Registers a url converter for use like so
 
-    app.url_map.converters['hashid'] = HashIDConverter
-    @app.route('<hashid:user_id>'):
-    def user(user_id):
-        pass
+    >>> app.url_map.converters['hashid'] = HashIDConverter
+    >>> @app.route('<hashid:user_id>'):
+    >>> def user(user_id):
+    >>>     pass
     '''
 
-    SALT = ''
+    def __init__(self, app=None):
+        if app:
+            self.salt = ''
+            self.init_app(app)
 
     @property
     def hashid(self):
-        return hashids.Hashids(salt=self.SALT)
+        return hashids.Hashids(salt=self.salt)
 
-    def to_python(self, value):
-        try:
-            return self.hashid.decode(value)[0]
-        except IndexError:
-            abort(404)
+    def decode(self, value):
+        return self.hashid.decode(value)
 
-    def to_url(self, value):
+    def encode(self, value):
         return self.hashid.encode(value)
 
-    @classmethod
-    def with_salt(cls, salt):
-        '''Return a variant with a salt.
-        '''
-        # implemented like this because it seems like the url converters
-        # are invoked outside off the app context so it cannot access the
-        # config where the salt is defined.
-        class HashIDConverter_(HashIDConverter):
-            SALT = salt
+    def init_app(self, app):
+        self.salt = app.config.get('HASHID_SALT', '')
 
-        return HashIDConverter_
+        class HashIDConverter(BaseConverter):
+            def to_python(self_, value):
+                try:
+                    return self.decode(value)[0]
+                except IndexError:
+                    abort(404)
+
+            def to_url(self_, value):
+                return self.encode(value)
+
+        app.url_map.converters['hashid'] = HashIDConverter
 
 
 class Auth(object):
@@ -427,6 +430,16 @@ class Auth(object):
         # https://github.com/miguelgrinberg/Flask-HTTPAuth/blob/master/flask_httpauth.py#L51-L55
         @functools.wraps(f)
         def wrapper(*args, **kwargs):
-            self.authorize_with_token(request.headers.get('Authorization'))
+            auth_header = request.headers.get('Authorization', None)
+            if not auth_header:
+                raise AuthorizationError
+            self.authorize_with_token(auth_header)
             return f(*args, **kwargs)
         return wrapper
+
+
+def get_or_404(model, id):
+    rv = model.query.get(id)
+    if not rv:
+        abort(404)
+    return rv

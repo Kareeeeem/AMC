@@ -6,12 +6,12 @@ from marshmallow import (
     validate,
     ValidationError,
     validates_schema,
-    # pre_dump,
+    post_load,
     post_dump,
 )
 from sqlalchemy import or_
 
-from app import models
+from app import models, hashid
 
 
 def validate_unique(schema, data, model):
@@ -116,6 +116,19 @@ class ExpandableNested(fields.Nested):
         return super(ExpandableNested, self)._serialize(value, attr, obj)
 
 
+class HashIDField(fields.Field):
+    def _serialize(self, value, attr, obj):
+        if value:
+            return hashid.encode(value)
+
+    def _deserialize(self, value, attr, data):
+        if value:
+            try:
+                return hashid.decode(value)[0]
+            except IndexError:
+                raise ValidationError('Invalid id')
+
+
 # TODO post dump logic such as wrapping, pagination data, etc.
 class SchemaOpts(_SchemaOpts):
     def __init__(self, meta):
@@ -141,6 +154,7 @@ class Schema(_Schema):
 
 
 class ExerciseSchema(Schema):
+    id = HashIDField()
     title = fields.Str(required=True)
     description = fields.Str(required=True)
     data = fields.Dict()
@@ -152,10 +166,11 @@ class ExerciseSchema(Schema):
 
     class Meta:
         additional = ('created_at', 'updated_at')
-        dump_only = ('created_at', 'updated_at', 'favorited')
+        dump_only = ('created_at', 'updated_at', 'favorited', 'id')
 
 
 class UserSchema(Schema):
+    id = HashIDField()
     username = fields.Str(required=True)
     email = fields.Email(required=True)
     password = fields.Str(required=True, validate=validate.Length(min=8))
@@ -189,7 +204,7 @@ class UserSchema(Schema):
     class Meta:
         load_only = ('password',)
         additional = ('created_at', 'updated_at', 'last_login')
-        dump_only = ('created_at', 'updated_at', 'last_login')
+        dump_only = ('created_at', 'updated_at', 'last_login', 'id')
 
 
 class PaginationSchema(Schema):
@@ -203,3 +218,11 @@ class PaginationSchema(Schema):
     first = fields.Url(attribute='first_page_url')
     last = fields.Url(attribute='last_page_url')
     current = fields.Url(attribute='current_page_url')
+
+
+class IDSchema(Schema):
+    id = HashIDField(required=True)
+
+    @post_load
+    def extract_id(self, data):
+        return data['id']

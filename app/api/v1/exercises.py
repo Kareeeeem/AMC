@@ -8,6 +8,7 @@ from app.lib import (
     Pagination,
     parse_query_params,
     get_location_header,
+    get_or_404,
 )
 
 from sqlalchemy import and_
@@ -48,8 +49,9 @@ def get_exercises():
     search_terms = request.args.get('search')
 
     if auth.current_user:
-        # We want to know which exercises the user favorited.  We do an outer
-        # join and ask for the exercise and the user_id.
+        # We also want to know which exercises the authenticated user
+        # favorited. We do an outer join and ask for the exercise and the
+        # user_id.
         query = db.session.query(Exercise, UserFavoriteExercise.user_id).\
             outerjoin(UserFavoriteExercise, and_(
                 Exercise.id == UserFavoriteExercise.exercise_id,
@@ -58,14 +60,15 @@ def get_exercises():
 
         query = Exercise.search(search_terms, query=query)
         page = Pagination(request, query.count())
-        result = query.offset(page.offset).limit(page.limit).all()
+        results = query.offset(page.offset).limit(page.limit).all()
 
         # The result contains rows of tuples (exercise, user_id or None).  We
         # run setattr in our generator expression to set exercise.favorited to
         # bool(user_id). Setattr itself always returns None, so because of the
         # OR statement the exercise will be placed in the retulting iterable.
         exercises = (setattr(exercise, 'favorited', bool(user_id)) or exercise
-                     for exercise, user_id in result)
+                     for exercise, user_id in results)
+
     else:
         query = Exercise.search(search_terms)
         page = Pagination(request, query.count())
@@ -75,25 +78,19 @@ def get_exercises():
     return schema.dump(exercises, many=True).data
 
 
-@v1.route('/exercises<hashid:id>', methods=['GET'])
+@v1.route('/exercises/<hashid:id>', methods=['GET'])
 def get_exercise(id):
     '''Get an exercise.'''
-    exercise = Exercise.query.get(id)
-    if not exercise:
-        abort(404)
-
+    exercise = get_or_404(Exercise, id)
     schema = ExerciseSchema(expand=parse_query_params(request.args))
     return schema.dump(exercise).data
 
 
-@v1.route('/exercises<hashid:id>', methods=['PUT'])
+@v1.route('/exercises/<hashid:id>', methods=['PUT'])
 @auth.token_required
 def put_exercise(id):
     '''Update an exercise.'''
-    exercise = Exercise.query.get(id)
-    if not exercise:
-        abort(404)
-
+    exercise = get_or_404(Exercise, id)
     if auth.current_user.id != exercise.author_id:
         raise AuthorizationError
 
@@ -107,14 +104,11 @@ def put_exercise(id):
     return schema.dump(exercise).data
 
 
-@v1.route('/exercises<hashid:id>', methods=['DELETE'])
+@v1.route('/exercises/<hashid:id>', methods=['DELETE'])
 @auth.token_required
 def delete_exercise(id):
     '''Delete an exercise.'''
-    exercise = Exercise.query.get(id)
-    if not exercise:
-        abort(404)
-
+    exercise = get_or_404(Exercise, id)
     if auth.current_user.id != exercise.author_id:
         raise AuthorizationError
 
