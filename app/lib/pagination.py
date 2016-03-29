@@ -19,7 +19,7 @@ class Pagination(object):
         self.total_count = count
 
         if self.page < 1 or self.page > self.pages or self.per_page > 100:
-            raise PaginationError(self.page)
+            raise PaginationError(self)
 
         self.current_page_url = self.generate_url(page=self.page, per_page=self.per_page)
         self.first_page_url = self.generate_url(page=1, per_page=self.per_page)
@@ -60,14 +60,14 @@ class PaginationError(Exception):
     def __init__(self, page, status_code=400):
         messages = []
         if page.page > 0:
-            self.messages.append('Page %s out of range, collection has %s pages.'
-                                 % (page.page, page.max_pages))
+            messages.append('Page %s out of range, collection has %s pages.'
+                            % (page.page, page.pages))
         if page.page < 1:
-            self.messages.append('Page %s out of range, pages start at 1.'
-                                 % page.page)
+            messages.append('Page %s out of range, pages start at 1.'
+                            % page.page)
         if page.per_page > 100:
-            self.messages.append('Max per_page is 100.')
+            messages.append('Max per_page is 100.')
 
         self.response = dict(status_code=status_code, message=messages)
 
-        super(PaginationError, self).__init__(self.messages)
+        super(PaginationError, self).__init__(messages)
