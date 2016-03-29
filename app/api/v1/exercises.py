@@ -3,8 +3,8 @@ from flask import abort, request
 from app import auth, db
 from app.models import Exercise, UserFavoriteExercise
 from app.serializers import ExerciseSchema
-from app.exceptions import AuthorizationError
 from app.lib import (
+    AuthorizationError,
     Pagination,
     parse_query_params,
     get_location_header,

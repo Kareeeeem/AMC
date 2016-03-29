@@ -11,13 +11,13 @@ def test_url_field(user, session):
 def test_nested_field_collapsed(user, exercise, session):
     s = UserSchema()
     rv = s.dump(user).data
-    assert rv['exercises'] == url_for('v1.get_user_exercises', id=user.id)
+    assert rv['authored_exercises'] == url_for('v1.get_user_exercises', id=user.id)
 
 
 def test_nested_field_expanded(user, exercise, session):
-    s = UserSchema(expand=['exercises'])
+    s = UserSchema(expand=['authored_exercises'])
     rv = s.dump(user).data
-    assert isinstance(rv['exercises'][0], dict)
+    assert isinstance(rv['authored_exercises'][0], dict)
 
 
 def test_nested_field_recursive(user, exercise, session):
