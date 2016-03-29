@@ -3,7 +3,13 @@ from flask import request
 from app import auth, db
 from app.models import User, Exercise, UserFavoriteExercise
 from app.serializers import UserSchema, ExerciseSchema, IDSchema
-from app.lib import get_location_header, Pagination, parse_query_params, get_or_404, AuthorizationError, PaginationError
+from app.lib import (
+    AuthorizationError,
+    get_location_header,
+    get_or_404,
+    Pagination,
+    parse_query_params,
+)
 
 
 from . import v1
@@ -18,11 +24,6 @@ from . import v1
 # /users/<id>/favorites       GET     retreive all exercises favorited by user
 # TODO /users/<id>/ratings    GET     retreive all ratings authored by user
 # TODO /users/<id>/responses  GET     retreive all responses authored by user
-
-
-@v1.errorhandler(PaginationError)
-def pagination_error(exception=None):
-    return dict(errors=exception.response), 400
 
 
 @v1.route('/users', methods=['POST'])

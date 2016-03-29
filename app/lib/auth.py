@@ -13,17 +13,6 @@ class Auth(object):
         self.verify_token_callback = None
         self.verify_login_callback = None
 
-        if app:
-            self.init_app(app)
-
-    def init_app(self, app):
-        '''Initialize the extension with the app. That means registering a
-        default authorization error handlder.
-        '''
-        @app.errorhandler(AuthorizationError)
-        def unauthorized(exception):
-            return dict(errors=exception.response), exception.status_code
-
     def verify_token(self, f):
         '''Registers a callback to be run to validate the token. The callback
         should return True in case of success.
