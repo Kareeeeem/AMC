@@ -46,35 +46,32 @@ def post_exercises():
 @auth.token_optional
 def get_exercises():
     '''Get exercise collection.'''
-    search_terms = request.args.get('search')
+    query = Exercise.search(request.args.get('search'))
+    page = Pagination(request, query.count())
+    schema = ExerciseSchema(page=page, expand=parse_query_params(request.args))
 
-    if auth.current_user:
-        # We also want to know which exercises the authenticated user
-        # favorited. We do an outer join and ask for the exercise and the
-        # user_id.
-        query = db.session.query(Exercise, UserFavoriteExercise.user_id).\
+    if not auth.current_user:
+        exercises = query.offset(page.offset).limit(page.limit).all()
+    else:
+        # We want to know which exercises the authenticated user favorited. We
+        # do an outer join to UserFavoriteExercise and add the user_id column
+        # to our results. This will add the user_id to any row that contains an
+        # exercise the user favorited, and None otherwise. The result could
+        # look something like this:
+        # [(<an exercise>, <a user id>), (<an exercise>, None)]
+        results = query.add_columns(UserFavoriteExercise.user_id).\
             outerjoin(UserFavoriteExercise, and_(
-                Exercise.id == UserFavoriteExercise.exercise_id,
-                UserFavoriteExercise.user_id == auth.current_user.id
-            ))
+                UserFavoriteExercise.exercise_id == Exercise.id,
+                UserFavoriteExercise.user_id == auth.current_user.id)).\
+            offset(page.offset).limit(page.limit).all()
 
-        query = Exercise.search(search_terms, query=query)
-        page = Pagination(request, query.count())
-        results = query.offset(page.offset).limit(page.limit).all()
-
-        # The result contains rows of tuples (exercise, user_id or None).  We
-        # run setattr in our generator expression to set exercise.favorited to
-        # bool(user_id). Setattr itself always returns None, so because of the
-        # OR statement the exercise will be placed in the retulting iterable.
+        # We run setattr in our generator expression to set exercise.favorited
+        # to bool(user_id). Setattr itself always returns None, so because of
+        # the OR statement the exercise will be placed in the resulting
+        # iterable.
         exercises = (setattr(exercise, 'favorited', bool(user_id)) or exercise
                      for exercise, user_id in results)
 
-    else:
-        query = Exercise.search(search_terms)
-        page = Pagination(request, query.count())
-        exercises = query.offset(page.offset).limit(page.limit).all()
-
-    schema = ExerciseSchema(page=page, expand=parse_query_params(request.args))
     return schema.dump(exercises, many=True).data
 
 
