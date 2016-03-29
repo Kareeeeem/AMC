@@ -17,6 +17,7 @@ from flask import (
     url_for,
 )
 from werkzeug.routing import BaseConverter
+from werkzeug.local import LocalProxy
 
 from app.exceptions import AuthorizationError, PaginationError
 
@@ -42,6 +43,9 @@ def parse_query_params(params):
 
 class Pagination(object):
     def __init__(self, request, count):
+        if count < 1:
+            abort(404)
+
         # the query_params multidict is immutable so make a copy of it.
         self.query_params = request.args.copy()
         self.view_args = request.view_args
@@ -317,7 +321,10 @@ class HashIDConverter(BaseConverter):
         return hashids.Hashids(salt=self.SALT)
 
     def to_python(self, value):
-        return self.hashid.decode(value)[0] or abort(404)
+        try:
+            return self.hashid.decode(value)[0]
+        except IndexError:
+            abort(404)
 
     def to_url(self, value):
         return self.hashid.encode(value)
@@ -391,18 +398,35 @@ class Auth(object):
             return f(*args, **kwargs)
         return wrapper
 
-    def token_required(self, f):
-        '''Decorate a route with this to require a token
+    def get_user(self, f):
+        '''Register a current_user callback as a werkzeug LocalProxy.'''
+        self.current_user = LocalProxy(f)
+
+    def authorize_with_token(self, auth_header):
+        if request.method != 'OPTIONS':
+            token_type, token = auth_header.split(' ')
+
+            if token_type != 'Bearer' or not self.verify_token_callback(token):
+                raise AuthorizationError
+
+    def token_optional(self, f):
+        '''Decorate a route with this to make token auth optional.
         '''
         # https://github.com/miguelgrinberg/Flask-HTTPAuth/blob/master/flask_httpauth.py#L51-L55
         @functools.wraps(f)
         def wrapper(*args, **kwargs):
-            if request.method != 'OPTIONS':
-                auth = request.headers.get('Authorization', ' ')
-                token_type, token = auth.split(' ')
+            if 'Authorization' in request.headers:
+                self.authorize_with_token(request.headers.get('Authorization'))
 
-                if token_type != 'Bearer' or not self.verify_token_callback(token):
-                    raise AuthorizationError
+            return f(*args, **kwargs)
+        return wrapper
 
+    def token_required(self, f):
+        '''Decorate a route with this to require a token.
+        '''
+        # https://github.com/miguelgrinberg/Flask-HTTPAuth/blob/master/flask_httpauth.py#L51-L55
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
+            self.authorize_with_token(request.headers.get('Authorization'))
             return f(*args, **kwargs)
         return wrapper
