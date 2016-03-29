@@ -1,8 +1,8 @@
-from flask import request, abort, g
+from flask import request, abort
 
 from app import auth, db
 from app.exceptions import AuthorizationError, PaginationError
-from app.models import User, Exercise
+from app.models import User, Exercise, UserFavoriteExercise
 from app.serializers import UserSchema, ExerciseSchema
 from app.lib import (
     get_location_header,
@@ -19,6 +19,7 @@ from . import v1
 # /users/<id>                 PUT     edit user
 # /users/<id>                 DELETE  edit user
 # /users/<id>/exercises       GET     retreive all exercises authored by user
+# /users/<id>/favorites       GET     retreive all exercises favorited by user
 # TODO /users/<id>/ratings    GET     retreive all ratings authored by user
 # TODO /users/<id>/responses  GET     retreive all responses authored by user
 
@@ -59,6 +60,14 @@ def get_user(id):
     return userschema.dump(user).data
 
 
+@v1.route('/users/profile', methods=['GET'])
+@auth.token_required
+def get_profile():
+    '''Get a single user. '''
+    userschema = UserSchema(expand=parse_query_params(request.args))
+    return userschema.dump(auth.current_user).data
+
+
 @v1.route('/users/<hashid:id>', methods=['PUT'])
 @auth.token_required
 def put_user(id):
@@ -67,7 +76,7 @@ def put_user(id):
     if not user:
         abort(404)
 
-    elif user.id != g.current_user.id:
+    elif user.id != auth.current_user.id:
         raise AuthorizationError
 
     schema = UserSchema(exclude=('password',))
@@ -88,7 +97,7 @@ def delete_user(id):
     if not user:
         abort(404)
 
-    elif user.id != g.current_user.id:
+    elif user.id != auth.current_user.id:
         raise AuthorizationError
 
     user.delete(db.session)
@@ -103,6 +112,21 @@ def get_user_exercises(id):
         abort(404)
 
     query = Exercise.query.filter(Exercise.author_id == user.id)
+    page = Pagination(request, query.count())
+    exercises = query.offset(page.offset).limit(page.limit).all()
+    schema = ExerciseSchema(page=page, expand=parse_query_params(request.args))
+    return schema.dump(exercises, many=True).data
+
+
+@v1.route('/users/<hashid:id>/favorites', methods=['GET'])
+@auth.token_required
+def get_user_favorites(id):
+    '''Get collection of exercises authored by user.'''
+    query = Exercise.query.\
+        join(UserFavoriteExercise).\
+        filter(UserFavoriteExercise.user_id == auth.current_user.id).\
+        order_by(UserFavoriteExercise.ordinal)
+
     page = Pagination(request, query.count())
     exercises = query.offset(page.offset).limit(page.limit).all()
     schema = ExerciseSchema(page=page, expand=parse_query_params(request.args))

@@ -18,6 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import INT4RANGE, JSONB, TSVECTOR
 from sqlalchemy.ext.orderinglist import ordering_list
+from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import relationship, backref
 
 from meta.orm import db
@@ -36,9 +37,8 @@ class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
     email = Column(String, unique=True, nullable=False)
     last_login = Column(DateTime)
 
-    exercises = relationship(
+    authored_exercises = relationship(
         'Exercise',
-        # lazy='dynamic',
         backref=backref('author', lazy='joined'),
     )
 
@@ -49,14 +49,22 @@ class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
         order_by='QuestionnaireResponse.created_at',
     )
 
-    exercise_collection = relationship(
-        'ExerciseCollection',
+    user_favorite_exercises = relationship(
+        'UserFavoriteExercise',
+        order_by='UserFavoriteExercise.ordinal',
         collection_class=ordering_list('ordinal'),
         cascade='all, delete-orphan',
         passive_deletes=True,
     )
 
-    rating = relationship(
+    # a proxy to the exercise values of the above relationship.
+    favorite_exercises = association_proxy(
+        'user_favorite_exercises',
+        'exercise',
+        # allows list operations such as appending, popping, extending
+        creator=lambda exercise: UserFavoriteExercise(exercise=exercise))
+
+    ratings = relationship(
         'Rating',
         backref='user',
         cascade='all, delete-orphan',
@@ -90,26 +98,47 @@ class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
                 ))
 
 
-class ExerciseCollection(Base):
-    user_id = Column(ID_TYPE,
-                     ForeignKey('user.id', ondelete='CASCADE'),
-                     primary_key=True)
-    exercise_id = Column(ID_TYPE,
-                         ForeignKey('exercise.id', ondelete='CASCADE'),
-                         primary_key=True)
+class UserFavoriteExercise(Base):
+    __tablename__ = 'user_favorite_exercise'
     ordinal = Column(Integer)
+    added = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user_id = Column(
+        ID_TYPE,
+        ForeignKey('user.id', ondelete='CASCADE'),
+        primary_key=True)
+    exercise_id = Column(
+        ID_TYPE,
+        ForeignKey('exercise.id', ondelete='CASCADE'),
+        primary_key=True)
     exercise = relationship('Exercise', passive_deletes=True, lazy='joined')
+
+    def __repr__(self):
+        return ('UserFavoriteExercise(ordinal=%r, user_id=%r, exercise_id=%r)' % (
+            self.ordinal,
+            self.user_id,
+            self.exercise_id,
+        ))
 
 
 class Rating(Base):
-    user_id = Column(ID_TYPE,
-                     ForeignKey('user.id', ondelete='CASCADE'),
-                     primary_key=True)
-    exercise_id = Column(ID_TYPE,
-                         ForeignKey('exercise.id', ondelete='CASCADE'),
-                         primary_key=True)
-    exercise = relationship('Exercise', passive_deletes=True, lazy='joined')
     rating = Column(Float, nullable=False)
+    user_id = Column(
+        ID_TYPE,
+        ForeignKey('user.id', ondelete='CASCADE'),
+        primary_key=True)
+    exercise_id = Column(
+        ID_TYPE,
+        ForeignKey('exercise.id', ondelete='CASCADE'),
+        primary_key=True)
+    exercise = relationship('Exercise', passive_deletes=True, lazy='joined')
+
+    def __repr__(self):
+        return ('UserFavoriteExercise(rating=%r, user_id=%r, exercise_id=%r)' % (
+            self.rating,
+            self.user_id,
+            self.exercise_id,
+        ))
 
 
 class Questionnaire(Base):
@@ -316,7 +345,7 @@ where(Choice.response_id == QuestionnaireResponse.id).as_scalar(), Integer)))
                 ))
 
 
-class Exercise(Base, CreatedUpdatedMixin):
+class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     MAX_EDIT_TIME = timedelta(hours=3)
 
     id = IDColumn()
@@ -332,13 +361,13 @@ class Exercise(Base, CreatedUpdatedMixin):
     def search(cls, search_terms, query=None):
         # TODO support more complex queries
         # only support AND queries for now
-        search_terms = (' & ').join(search_terms.split())
-
         if not query:
             query = cls.query
 
-        query = query.filter(cls.tsv.match(search_terms)).\
-            order_by(func.ts_rank(cls.tsv, func.to_tsquery(search_terms)).desc())
+        if search_terms:
+            search_terms = (' & ').join(search_terms.split())
+            query = query.filter(cls.tsv.match(search_terms)).\
+                order_by(func.ts_rank(cls.tsv, func.to_tsquery(search_terms)).desc())
 
         return query
 
@@ -393,6 +422,8 @@ __all__ = [
     'Choice',
     'db',
     'Exercise',
+    'Rating',
+    'UserFavoriteExercise',
     'Option',
     'Question',
     'Questionnaire',

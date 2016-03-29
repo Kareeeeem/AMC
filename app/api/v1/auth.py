@@ -7,13 +7,21 @@ from app.lib import get_location_header
 from . import v1
 
 
+@auth.get_user
+def get_user():
+    '''Callback to be ran when accessing the auth.current_user LocalProxy.'''
+    try:
+        return g.current_user
+    except AttributeError:
+        return None
+
+
 @auth.verify_token
 def verify_token(token):
     '''Callback to be ran when a route is marked as token_required.
     '''
     data = models.User.verify_auth_token(token)
     if data:
-        g.claims = data
         g.current_user = models.User.query.get(data['id'])
         return True
 

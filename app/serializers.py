@@ -148,26 +148,39 @@ class ExerciseSchema(Schema):
                          route_args={'id': 'id'},
                          dump_only=True)
     author = ExpandableNested('UserSchema', exclude=('exercises',))
+    favorited = fields.Bool()
 
     class Meta:
         additional = ('created_at', 'updated_at')
-        dump_only = ('created_at', 'updated_at')
+        dump_only = ('created_at', 'updated_at', 'favorited')
 
 
 class UserSchema(Schema):
     username = fields.Str(required=True)
     email = fields.Email(required=True)
     password = fields.Str(required=True, validate=validate.Length(min=8))
-    href = FlaskUrlField(route='v1.get_user',
-                         route_args={'id': 'id'},
-                         dump_only=True)
-    exercises = ExpandableNested('ExerciseSchema',
-                                 collection_route='v1.get_user_exercises',
-                                 collection_route_args={'id': 'id'},
-                                 exclude=('author',),
-                                 dump_only=True,
-                                 many=True,
-                                 )
+
+    href = FlaskUrlField(
+        route='v1.get_user',
+        route_args={'id': 'id'},
+        dump_only=True)
+
+    authored_exercises = ExpandableNested(
+        'ExerciseSchema',
+        collection_route='v1.get_user_exercises',
+        collection_route_args={'id': 'id'},
+        exclude=('author',),
+        dump_only=True,
+        many=True,
+    )
+
+    favorite_exercises = ExpandableNested(
+        'ExerciseSchema',
+        collection_route='v1.get_user_favorites',
+        collection_route_args={'id': 'id'},
+        dump_only=True,
+        many=True,
+    )
 
     @validates_schema
     def validate(self, data):
