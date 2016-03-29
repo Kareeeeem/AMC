@@ -1,10 +1,9 @@
 from flask import request
 
 from app import auth, db
-from app.exceptions import AuthorizationError, PaginationError
 from app.models import User, Exercise, UserFavoriteExercise
 from app.serializers import UserSchema, ExerciseSchema, IDSchema
-from app.lib import get_location_header, Pagination, parse_query_params, get_or_404
+from app.lib import get_location_header, Pagination, parse_query_params, get_or_404, AuthorizationError, PaginationError
 
 
 from . import v1
