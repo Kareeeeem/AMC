@@ -66,7 +66,8 @@ def create(ctx, d):
 def fill(obj):
     db, models = get_db_and_models()
     users = generate_users()
-    generate_exercises(users)
+    exercises = generate_exercises(users)
+    users[0].favorite_exercises = exercises[:10]
 
     basedir = os.path.abspath(os.path.dirname(__file__))
     with open(os.path.join(basedir, 'amisos.json')) as amisos_json:

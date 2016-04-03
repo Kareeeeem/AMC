@@ -42,7 +42,9 @@ def get_users():
     query = User.query
     page = Pagination(request, query.count())
     users = query.offset(page.offset).limit(page.limit).all()
-    schema = UserSchema(page=page, expand=parse_query_params(request.args))
+    schema = UserSchema(page=page,
+                        expand=parse_query_params(request.args),
+                        exclude=('favorite_exercises',))
     return schema.dump(users, many=True).data
 
 
@@ -50,7 +52,8 @@ def get_users():
 def get_user(id):
     '''Get a single user. '''
     user = get_or_404(User, id)
-    userschema = UserSchema(expand=parse_query_params(request.args))
+    userschema = UserSchema(expand=parse_query_params(request.args),
+                            exclude=('favorite_exercises',))
     return userschema.dump(user).data
 
 

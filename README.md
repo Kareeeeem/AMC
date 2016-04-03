@@ -21,8 +21,7 @@ This will install
 
 #System dependencies
 Make super system dependencies are installed for
-* psycopg2
-* bcrypt
+* libpq-dev
 
 To make full text search work run this query as the database owner.
 ```

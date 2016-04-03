@@ -161,7 +161,9 @@ class ExerciseSchema(Schema):
     href = FlaskUrlField(route='v1.get_exercise',
                          route_args={'id': 'id'},
                          dump_only=True)
-    author = ExpandableNested('UserSchema', exclude=('exercises',))
+    author = ExpandableNested('UserSchema',
+                              exclude=('authored_exercises',
+                                       'favorite_exercises'))
     favorited = fields.Bool()
 
     class Meta:

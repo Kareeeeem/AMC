@@ -16,12 +16,6 @@ def pagination_error(exception=None):
     return dict(errors=exception.response), 400
 
 
-@v1.errorhandler(404)
-def not_found_error(exception=None):
-    error = dict(status_code=404, message='Resource not found')
-    return dict(errors=error), 404
-
-
 @v1.errorhandler(AuthorizationError)
 def unauthorized(exception=None):
     return dict(errors=exception.response), exception.status_code
