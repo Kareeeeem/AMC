@@ -13,9 +13,9 @@ def validation_error(exception=None):
 
 @v1.errorhandler(PaginationError)
 def pagination_error(exception=None):
-    return dict(errors=exception.response), 400
+    return exception.response, exception.status_code
 
 
 @v1.errorhandler(AuthorizationError)
 def unauthorized(exception=None):
-    return dict(errors=exception.response), exception.status_code
+    return exception.response, exception.status_code

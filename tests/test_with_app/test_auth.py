@@ -13,7 +13,7 @@ def login(app, username, password):
 
 def test_login(app, user):
     rv = login(app, 'kareem', '0000')
-    assert rv.status_code == 303
+    assert rv.status_code == 200
 
 
 def test_login_fail(app, user):
@@ -50,12 +50,12 @@ def test_login_fail4(app, user):
 
 def test_case_insensitive_login(app, user):
     rv = login(app, 'kAreEm', '0000')
-    assert rv.status_code == 303
+    assert rv.status_code == 200
 
 
 def test_email_login(app, user):
     rv = login(app, 'kareem@gmail.com', '0000')
-    assert rv.status_code == 303
+    assert rv.status_code == 200
 
 
 def test_jwt(app, user):

@@ -41,9 +41,9 @@ class Auth(object):
             username = form.get('username')
             password = form.get('password')
 
-            if (not username
-                    or not password
-                    or not self.verify_login_callback(username, password)):
+            if (not username or
+                    not password or
+                    not self.verify_login_callback(username, password)):
                 raise AuthorizationError
 
             return f(*args, **kwargs)
@@ -55,7 +55,11 @@ class Auth(object):
 
     def authorize_with_token(self, auth_header):
         if request.method != 'OPTIONS':
-            token_type, token = auth_header.split(' ')
+            try:
+                token_type, token = auth_header.split(' ')
+            except ValueError:
+                # malformed header
+                raise AuthorizationError
 
             if token_type != 'Bearer' or not self.verify_token_callback(token):
                 raise AuthorizationError
@@ -90,5 +94,5 @@ class AuthorizationError(Exception):
     def __init__(self, message=None, status_code=401):
         self.message = message or "Unauthorized request"
         self.status_code = status_code
-        self.response = dict(status=self.status_code, message=self.message)
+        self.response = dict(errors=dict(status=self.status_code, message=self.message))
         super(AuthorizationError, self).__init__(self.message)
