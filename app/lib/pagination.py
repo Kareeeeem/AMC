@@ -1,13 +1,10 @@
 import math
 
-from flask import abort, url_for
+from flask import url_for
 
 
 class Pagination(object):
     def __init__(self, request, count):
-        if count < 1:
-            abort(404)
-
         # the query_params multidict is immutable so make a copy of it.
         self.query_params = request.args.copy()
         self.view_args = request.view_args
@@ -35,7 +32,8 @@ class Pagination(object):
 
     @property
     def pages(self):
-        return int(math.ceil(self.total_count / float(self.per_page)))
+        pages = int(math.ceil(self.total_count / float(self.per_page)))
+        return pages or 1
 
     @property
     def prev_page_url(self):

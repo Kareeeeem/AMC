@@ -1,7 +1,8 @@
 from flask import g
 from sqlalchemy import or_
 
-from app import auth, db, models
+from app import auth, db
+from app.models import User
 from app.lib import get_location_header
 
 from . import v1
@@ -20,26 +21,19 @@ def get_user():
 def verify_token(token):
     '''Callback to be ran when a route is marked as token_required.
     '''
-    data = models.User.verify_auth_token(token)
+    data = User.verify_auth_token(token)
     if data:
-        g.current_user = models.User.query.get(data['id'])
+        g.current_user = User.query.get(data['id'])
         return True
-
-
-def find_user_with_login(username_or_email, password):
-    '''Find a user with the login information, username and email are matched
-    case insensitive.
-    '''
-    filter_clause = or_(models.User.username.ilike(username_or_email),
-                        models.User.email.ilike(username_or_email))
-    return db.session.query(models.User).filter(filter_clause).first()
 
 
 @auth.verify_login
 def verify_login(username_or_email, password):
     '''Callback to be ran when a route is marked as login_required.
     '''
-    user = find_user_with_login(username_or_email, password)
+    user = User.query.filter(or_(User.username.ilike(username_or_email),
+                                 User.email.ilike(username_or_email))).first()
+
     if user and user.password == password:
         g.user = user
         return True

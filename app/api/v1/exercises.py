@@ -1,4 +1,4 @@
-from flask import abort, request
+from flask import request
 
 from app import auth, db
 from app.models import Exercise, UserFavoriteExercise
@@ -48,7 +48,7 @@ def get_exercises():
     '''Get exercise collection.'''
     query = Exercise.search(request.args.get('search'))
     page = Pagination(request, query.count())
-    schema = ExerciseSchema(page=page, expand=parse_query_params(request.args))
+    schema = ExerciseSchema(page=page, expand=parse_query_params(request.args, key='expand'))
 
     if not auth.current_user:
         exercises = query.offset(page.offset).limit(page.limit).all()
@@ -65,21 +65,25 @@ def get_exercises():
                 UserFavoriteExercise.user_id == auth.current_user.id)).\
             offset(page.offset).limit(page.limit).all()
 
-        # We run setattr in our generator expression to set exercise.favorited
-        # to bool(user_id). Setattr itself always returns None, so because of
-        # the OR statement the exercise will be placed in the resulting
-        # iterable.
-        exercises = (setattr(exercise, 'favorited', bool(user_id)) or exercise
+        exercises = (setattr_and_return(exercise, 'favorited', bool(user_id))
                      for exercise, user_id in results)
 
     return schema.dump(exercises, many=True).data
+
+
+def setattr_and_return(obj, key, value):
+    '''A setattr function that returns the object. Usefull for setting
+    attributes in expressions and comprehensions.
+    '''
+    setattr(obj, key, value)
+    return obj
 
 
 @v1.route('/exercises/<hashid:id>', methods=['GET'])
 def get_exercise(id):
     '''Get an exercise.'''
     exercise = get_or_404(Exercise, id)
-    schema = ExerciseSchema(expand=parse_query_params(request.args))
+    schema = ExerciseSchema(expand=parse_query_params(request.args, key='expand'))
     return schema.dump(exercise).data
 
 
@@ -90,10 +94,6 @@ def put_exercise(id):
     exercise = get_or_404(Exercise, id)
     if auth.current_user.id != exercise.author_id:
         raise AuthorizationError
-
-    if not exercise.allow_edit():
-        # TODO return a better error message
-        abort(400)
 
     schema = ExerciseSchema()
     exercise_data = schema.load(request.get_json()).data

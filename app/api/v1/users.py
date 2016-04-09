@@ -2,7 +2,12 @@ from flask import request
 
 from app import auth, db
 from app.models import User, Exercise, UserFavoriteExercise
-from app.serializers import UserSchema, ExerciseSchema, IDSchema
+from app.serializers import (
+    ProfileSchema,
+    UserSchema,
+    ExerciseSchema,
+    ActionSchema,
+)
 from app.lib import (
     AuthorizationError,
     get_location_header,
@@ -29,7 +34,7 @@ from . import v1
 @v1.route('/users', methods=['POST'])
 def post_users():
     '''Register a user.'''
-    schema = UserSchema()
+    schema = ProfileSchema()
     user_data = schema.load(request.get_json()).data
     user = User.create(db.session, user_data)
     rv = schema.dump(user).data
@@ -43,26 +48,33 @@ def get_users():
     page = Pagination(request, query.count())
     users = query.offset(page.offset).limit(page.limit).all()
     schema = UserSchema(page=page,
-                        expand=parse_query_params(request.args),
+                        expand=parse_query_params(request.args, key='expand'),
                         exclude=('favorite_exercises',))
     return schema.dump(users, many=True).data
 
 
 @v1.route('/users/<hashid:id>', methods=['GET'])
+@auth.token_optional
 def get_user(id):
     '''Get a single user. '''
-    user = get_or_404(User, id)
-    userschema = UserSchema(expand=parse_query_params(request.args),
-                            exclude=('favorite_exercises',))
-    return userschema.dump(user).data
+    expand = parse_query_params(request.args, key='expand')
+
+    if auth.current_user and auth.current_user.id == id:
+        user = auth.current_user
+        schema = ProfileSchema(expand=expand)
+    else:
+        user = get_or_404(User, id)
+        schema = UserSchema(expand=expand)
+
+    return schema.dump(user).data
 
 
 @v1.route('/users/profile', methods=['GET'])
 @auth.token_required
 def get_profile():
     '''Get a single user. '''
-    userschema = UserSchema(expand=parse_query_params(request.args))
-    return userschema.dump(auth.current_user).data
+    schema = ProfileSchema(expand=parse_query_params(request.args, key='expand'))
+    return schema.dump(auth.current_user).data
 
 
 @v1.route('/users/<hashid:id>', methods=['PUT'])
@@ -74,7 +86,8 @@ def put_user(id):
     if user.id != auth.current_user.id:
         raise AuthorizationError
 
-    schema = UserSchema(exclude=('password',))
+    # TODO change password requires
+    schema = ProfileSchema(exclude=('password',))
     # Make the schema validator know about the user to be updated for
     # validating unique columns. A colission with 'self' is of course not a
     # collision.
@@ -101,7 +114,7 @@ def get_user_exercises(id):
     query = Exercise.query.filter(Exercise.author_id == id)
     page = Pagination(request, query.count())
     exercises = query.offset(page.offset).limit(page.limit).all()
-    schema = ExerciseSchema(page=page, expand=parse_query_params(request.args))
+    schema = ExerciseSchema(page=page, expand=parse_query_params(request.args, key='expand'))
     return schema.dump(exercises, many=True).data
 
 
@@ -115,23 +128,29 @@ def get_user_favorites(id):
     query = Exercise.query.\
         join(UserFavoriteExercise).\
         filter(UserFavoriteExercise.user_id == auth.current_user.id).\
-        order_by(UserFavoriteExercise.ordinal)
+        order_by(UserFavoriteExercise.ordinal.desc())
 
     page = Pagination(request, query.count())
     exercises = query.offset(page.offset).limit(page.limit).all()
-    schema = ExerciseSchema(page=page, expand=parse_query_params(request.args))
+    schema = ExerciseSchema(page=page, expand=parse_query_params(request.args, key='expand'))
     return schema.dump(exercises, many=True).data
 
 
 @v1.route('/users/<hashid:id>/favorites', methods=['POST'])
 @auth.token_required
 def add_to_favorites(id):
-    '''Add an exercise to favorites.'''
+    '''Add or remove an exercise to favorites.'''
     if auth.current_user.id != id:
         raise AuthorizationError
 
-    exercise_id = IDSchema().load(request.get_json()).data
-    exercise = get_or_404(Exercise, exercise_id)
-    auth.current_user.favorite_exercises.append(exercise)
+    data = ActionSchema().load(request.get_json()).data
+    exercise = get_or_404(Exercise, data['id'])
+    if data['action'] == ActionSchema.FAVORITE:
+        auth.current_user.favorite_exercises.append(exercise)
+    else:
+        UserFavoriteExercise.query.\
+            filter(UserFavoriteExercise.user_id == auth.current_user.id,
+                   UserFavoriteExercise.exercise_id == data['id']).\
+            delete(synchronize_session=False)
     db.session.commit()
     return {}, 204

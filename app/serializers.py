@@ -6,7 +6,6 @@ from marshmallow import (
     validate,
     ValidationError,
     validates_schema,
-    post_load,
     post_dump,
 )
 from sqlalchemy import or_
@@ -90,11 +89,16 @@ class ExpandableNested(fields.Nested):
     '''
     ROUTE_ERROR = 'ExpandableNested with many=True requires a collection route'
 
-    def __init__(self, nested, collection_route=None, collection_route_args=None,
+    def __init__(self, nested, collection_route=None, route_arg_keys=None,
                  *args, **kwargs):
+
         super(ExpandableNested, self).__init__(nested, *args, **kwargs)
+
+        if self.many and not collection_route:
+            raise AttributeError(self.ROUTE_ERROR)
+
         self.collection_route = collection_route
-        self.collection_route_args = collection_route_args or {}
+        self.route_arg_keys = route_arg_keys or {}
 
     def _serialize(self, value, attr, obj):
         expand = bool(attr in self.parent.expand)
@@ -102,11 +106,7 @@ class ExpandableNested(fields.Nested):
         if self.many and not expand:
             # return the collection route, no needs to serialize anything from
             # the nested collection.
-
-            if not self.collection_route:
-                raise AttributeError(self.ROUTE_ERROR)
-
-            route_args = get_url_arguments_from_obj(obj, **self.collection_route_args)
+            route_args = get_url_arguments_from_obj(obj, **self.route_arg_keys)
             return generate_url(self.collection_route, **route_args)
 
         elif not self.many and not expand:
@@ -129,14 +129,12 @@ class HashIDField(fields.Field):
                 raise ValidationError('Invalid id')
 
 
-# TODO post dump logic such as wrapping, pagination data, etc.
 class SchemaOpts(_SchemaOpts):
     def __init__(self, meta):
         _SchemaOpts.__init__(self, meta)
         self.strict = True
 
 
-# TODO post dump logic such as wrapping, pagination data, etc.
 class Schema(_Schema):
     OPTIONS_CLASS = SchemaOpts
 
@@ -150,7 +148,7 @@ class Schema(_Schema):
         if many and self.page:
             page = PaginationSchema().dump(self.page).data
             page.update(items=data)
-            return dict(data=page)
+            return page
 
 
 class ExerciseSchema(Schema):
@@ -161,10 +159,10 @@ class ExerciseSchema(Schema):
     href = FlaskUrlField(route='v1.get_exercise',
                          route_args={'id': 'id'},
                          dump_only=True)
-    author = ExpandableNested('UserSchema',
-                              exclude=('authored_exercises',
-                                       'favorite_exercises'))
+    author = ExpandableNested('UserSchema')
+
     favorited = fields.Bool()
+    allow_edit = fields.Bool()
 
     class Meta:
         additional = ('created_at', 'updated_at')
@@ -172,10 +170,8 @@ class ExerciseSchema(Schema):
 
 
 class UserSchema(Schema):
-    id = HashIDField()
+    id = HashIDField(dump_only=True)
     username = fields.Str(required=True)
-    email = fields.Email(required=True)
-    password = fields.Str(required=True, validate=validate.Length(min=8))
 
     href = FlaskUrlField(
         route='v1.get_user',
@@ -185,16 +181,20 @@ class UserSchema(Schema):
     authored_exercises = ExpandableNested(
         'ExerciseSchema',
         collection_route='v1.get_user_exercises',
-        collection_route_args={'id': 'id'},
+        route_arg_keys={'id': 'id'},
         exclude=('author',),
         dump_only=True,
         many=True,
     )
 
+
+class ProfileSchema(UserSchema):
+    email = fields.Email()
+    password = fields.Str(required=True, validate=validate.Length(min=8))
     favorite_exercises = ExpandableNested(
         'ExerciseSchema',
         collection_route='v1.get_user_favorites',
-        collection_route_args={'id': 'id'},
+        route_arg_keys={'id': 'id'},
         dump_only=True,
         many=True,
     )
@@ -206,7 +206,7 @@ class UserSchema(Schema):
     class Meta:
         load_only = ('password',)
         additional = ('created_at', 'updated_at', 'last_login')
-        dump_only = ('created_at', 'updated_at', 'last_login', 'id')
+        dump_only = ('created_at', 'updated_at', 'last_login')
 
 
 class PaginationSchema(Schema):
@@ -222,9 +222,12 @@ class PaginationSchema(Schema):
     current = fields.Url(attribute='current_page_url')
 
 
-class IDSchema(Schema):
-    id = HashIDField(required=True)
+class ActionSchema(Schema):
+    FAVORITE = 'favorite'
+    UNFAVORITE = 'unfavorite'
 
-    @post_load
-    def extract_id(self, data):
-        return data['id']
+    id = HashIDField(required=True)
+    action = fields.Str(
+        required=True,
+        validate=validate.OneOf([FAVORITE, UNFAVORITE],
+                                error='Must be one of {choices}'))

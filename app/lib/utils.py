@@ -6,7 +6,7 @@ import inspect
 from flask import url_for, current_app, Response, jsonify, abort
 
 
-def parse_query_params(params):
+def parse_query_params(params, key):
     '''url query params might be given as such: ?expand=param1&expand=param2.
     or as such: ?expand=param1,param2. Or even as a combination of the two.
     Werkzeug saves these params in a multidict. So when ask for
@@ -21,7 +21,7 @@ def parse_query_params(params):
     ['one', 'two', 'tree', 'four']
     '''
 
-    raw_params = params.getlist('expand')
+    raw_params = params.getlist(key)
     return ','.join(raw_params).split(',')
 
 

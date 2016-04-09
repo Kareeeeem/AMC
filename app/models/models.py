@@ -13,6 +13,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Table,
     Text,
     UniqueConstraint,
 )
@@ -34,7 +35,7 @@ class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
     password = PasswordColumn()
 
     username = Column(String(32), unique=True, nullable=False)
-    email = Column(String, unique=True, nullable=False)
+    email = Column(String, unique=True)
     last_login = Column(DateTime)
 
     authored_exercises = relationship(
@@ -294,7 +295,7 @@ class QuestionnaireResponse(Base, CreatedUpdatedMixin):
 
     # This relationship joins to Score where the questionnaire ids match
     # and where the sum of the choices values of this response are
-    # contained in the score range. Generates the following SQL.
+    # contained in the score range. Generates the following SQL clause.
     #
     # FROM score
     # WHERE score.questionnaire_id = %(param_1)s AND
@@ -345,6 +346,22 @@ where(Choice.response_id == QuestionnaireResponse.id).as_scalar(), Integer)))
                 ))
 
 
+exercise_category = Table(
+    'exercise_category', Base.metadata,
+    Column('exercise_id', Integer, ForeignKey('exercise.id')),
+    Column('category.id', Integer, ForeignKey('category.id'))
+)
+
+
+class Category(Base):
+    id = IDColumn()
+    name = Column(String, nullable=False)
+
+
+class MaxEditTimeExpiredError(Exception):
+    pass
+
+
 class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     MAX_EDIT_TIME = timedelta(hours=3)
 
@@ -354,6 +371,12 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     data = Column(JSONB)
     tsv = Column(TSVECTOR)
     author_id = Column(ID_TYPE, ForeignKey('user.id'))
+
+    category = relationship(
+        'Category',
+        secondary=exercise_category,
+        backref='exercises',
+    )
 
     __table_args__ = Index('ix_exercise_tsv', 'tsv', postgresql_using='gin'),
 
@@ -371,11 +394,16 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
 
         return query
 
-    def allow_edit(self, datetime_=None):
+    @property
+    def allow_edit(self):
         '''Only allow edits if exercise is no older than MAX_EDIT_TIME.'''
-        if not datetime_:
-            datetime_ = datetime.utcnow()
-        return (datetime_ - self.created_at) < self.MAX_EDIT_TIME
+        return (datetime.utcnow() - self.created_at) < self.MAX_EDIT_TIME
+
+    def update(self, session, data, commit=True):
+        if not self.allow_edit:
+            raise MaxEditTimeExpiredError
+
+        return super(Exercise, self).update(session, data, commit=commit)
 
     def __repr__(self):
         return ('Exercise(id=%r, title=%r, description=%r, data=%r, '
@@ -422,11 +450,12 @@ __all__ = [
     'Choice',
     'db',
     'Exercise',
-    'Rating',
-    'UserFavoriteExercise',
+    'MaxEditTimeExpiredError',
     'Option',
     'Question',
     'Questionnaire',
     'QuestionnaireResponse',
+    'Rating',
     'User',
+    'UserFavoriteExercise',
 ]
