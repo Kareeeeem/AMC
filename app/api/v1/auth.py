@@ -23,8 +23,10 @@ def verify_token(token):
     '''
     data = User.verify_auth_token(token)
     if data:
-        g.current_user = User.query.get(data['id'])
-        return True
+        user = User.query.get(data['id'])
+        if user:
+            g.current_user = user
+            return True
 
 
 @auth.verify_login
