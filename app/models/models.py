@@ -109,11 +109,10 @@ class UserFavoriteExercise(Base):
         ID_TYPE,
         ForeignKey('exercise.id', ondelete='CASCADE'),
         primary_key=True)
-    exercise = relationship('Exercise', passive_deletes=True, lazy='joined')
+    exercise = relationship('Exercise', lazy='joined')
 
     def __repr__(self):
-        return ('UserFavoriteExercise(ordinal=%r, user_id=%r, exercise_id=%r)' % (
-            self.ordinal,
+        return ('UserFavoriteExercise(user_id=%r, exercise_id=%r)' % (
             self.user_id,
             self.exercise_id,
         ))
@@ -129,7 +128,7 @@ class Rating(Base):
         ID_TYPE,
         ForeignKey('exercise.id', ondelete='CASCADE'),
         primary_key=True)
-    exercise = relationship('Exercise', passive_deletes=True, lazy='joined')
+    exercise = relationship('Exercise', lazy='joined')
 
     def __repr__(self):
         return ('UserFavoriteExercise(rating=%r, user_id=%r, exercise_id=%r)' % (
