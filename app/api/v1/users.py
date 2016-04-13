@@ -3,19 +3,18 @@ from flask import request
 from app import auth, db
 from app.models import User, Exercise, UserFavoriteExercise
 from app.serializers import (
-    ProfileSchema,
-    UserSchema,
-    ExerciseSchema,
     ActionSchema,
+    ExerciseSchema,
+    ProfileSchema,
+    Serializer,
+    UserSchema,
 )
 from app.lib import (
     AuthorizationError,
     get_location_header,
     get_or_404,
     Pagination,
-    parse_query_params,
 )
-
 
 from . import v1
 
@@ -34,47 +33,39 @@ from . import v1
 @v1.route('/users', methods=['POST'])
 def post_users():
     '''Register a user.'''
-    schema = ProfileSchema()
-    user_data = schema.load(request.get_json()).data
-    user = User.create(db.session, user_data)
-    rv = schema.dump(user).data
-    return rv, 201, get_location_header('.get_user', id=user.id)
+    serializer = Serializer(ProfileSchema, request)
+    user = User.create(db.session, serializer.load())
+    return serializer.dump(user), 201, get_location_header('.get_user', id=user.id)
 
 
 @v1.route('/users', methods=['GET'])
 def get_users():
     '''Get users.'''
+    serializer = Serializer(UserSchema, request)
     query = User.query
-    page = Pagination(request, query.count())
-    users = query.offset(page.offset).limit(page.limit).all()
-    schema = UserSchema(page=page,
-                        expand=parse_query_params(request.args, key='expand'),
-                        exclude=('favorite_exercises',))
-    return schema.dump(users, many=True).data
+    page = Pagination(request, query=query)
+    return serializer.dump_page(page, exclude=('favorite_exercises',))
 
 
 @v1.route('/users/<hashid:id>', methods=['GET'])
 @auth.token_optional
 def get_user(id):
     '''Get a single user. '''
-    expand = parse_query_params(request.args, key='expand')
-
     if auth.current_user and auth.current_user.id == id:
         user = auth.current_user
-        schema = ProfileSchema(expand=expand)
+        serializer = Serializer(ProfileSchema, request)
     else:
         user = get_or_404(User, id)
-        schema = UserSchema(expand=expand)
+        serializer = Serializer(UserSchema, request)
 
-    return schema.dump(user).data
+    return serializer.dump(user)
 
 
 @v1.route('/users/profile', methods=['GET'])
 @auth.token_required
 def get_profile():
     '''Get a single user. '''
-    schema = ProfileSchema(expand=parse_query_params(request.args, key='expand'))
-    return schema.dump(auth.current_user).data
+    return Serializer(ProfileSchema, request).dump(auth.current_user)
 
 
 @v1.route('/users/<hashid:id>', methods=['PUT'])
@@ -86,15 +77,12 @@ def put_user(id):
     if user.id != auth.current_user.id:
         raise AuthorizationError
 
-    # TODO change password requires
-    schema = ProfileSchema(exclude=('password',))
-    # Make the schema validator know about the user to be updated for
-    # validating unique columns. A colission with 'self' is of course not a
-    # collision.
-    schema.context.update(update_id=user.id)
-    user_data = schema.load(request.get_json()).data
-    user.update(db.session, user_data)
-    return schema.dump(user).data
+    serializer = Serializer(ProfileSchema, request)
+    # This lets the schema validator know about the user to be updated for
+    # validating unique columns. So it can ignore false positives.
+    serializer.context = dict(update_id=user.id)
+    user.update(db.session, serializer.load(exclude=('password',)))
+    return serializer.dump(user)
 
 
 @v1.route('/users/<hashid:id>', methods=['DELETE'])
@@ -111,11 +99,9 @@ def delete_user(id):
 @v1.route('/users/<hashid:id>/exercises', methods=['GET'])
 def get_user_exercises(id):
     '''Get collection of exercises authored by user.'''
-    query = Exercise.query.filter(Exercise.author_id == id)
-    page = Pagination(request, query.count())
-    exercises = query.offset(page.offset).limit(page.limit).all()
-    schema = ExerciseSchema(page=page, expand=parse_query_params(request.args, key='expand'))
-    return schema.dump(exercises, many=True).data
+    query = Exercise.query.filter_by(author_id=id)
+    page = Pagination(request, query=query)
+    return Serializer(ExerciseSchema, request).dump_page(page)
 
 
 @v1.route('/users/<hashid:id>/favorites', methods=['GET'])
@@ -127,13 +113,11 @@ def get_user_favorites(id):
 
     query = Exercise.query.\
         join(UserFavoriteExercise).\
-        filter(UserFavoriteExercise.user_id == auth.current_user.id).\
+        filter_by(user_id=auth.current_user.id).\
         order_by(UserFavoriteExercise.ordinal.desc())
 
-    page = Pagination(request, query.count())
-    exercises = query.offset(page.offset).limit(page.limit).all()
-    schema = ExerciseSchema(page=page, expand=parse_query_params(request.args, key='expand'))
-    return schema.dump(exercises, many=True).data
+    page = Pagination(request, query=query)
+    return Serializer(ExerciseSchema, request).dump_page(page)
 
 
 @v1.route('/users/<hashid:id>/favorites', methods=['POST'])
@@ -148,9 +132,9 @@ def add_to_favorites(id):
     if data['action'] == ActionSchema.FAVORITE:
         auth.current_user.favorite_exercises.append(exercise)
     else:
+        # UNFAVORITE
         UserFavoriteExercise.query.\
-            filter(UserFavoriteExercise.user_id == auth.current_user.id,
-                   UserFavoriteExercise.exercise_id == data['id']).\
+            filter_by(user_id=auth.current_user.id, exercise_id=data['id']).\
             delete(synchronize_session=False)
     db.session.commit()
     return {}, 204

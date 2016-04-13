@@ -6,6 +6,14 @@ import inspect
 from flask import url_for, current_app, Response, jsonify, abort
 
 
+def setattr_and_return(obj, key, value):
+    '''A setattr function that returns the object. Usefull for setting
+    attributes in expressions and comprehensions.
+    '''
+    setattr(obj, key, value)
+    return obj
+
+
 def parse_query_params(params, key):
     '''url query params might be given as such: ?expand=param1&expand=param2.
     or as such: ?expand=param1,param2. Or even as a combination of the two.

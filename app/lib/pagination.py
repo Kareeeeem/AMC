@@ -4,7 +4,7 @@ from flask import url_for
 
 
 class Pagination(object):
-    def __init__(self, request, count):
+    def __init__(self, request, count=None, query=None):
         # the query_params multidict is immutable so make a copy of it.
         self.query_params = request.args.copy()
         self.view_args = request.view_args
@@ -13,7 +13,7 @@ class Pagination(object):
         # pop the original pagination params and save them.
         self.page = int(self.query_params.pop('page', 1))
         self.per_page = int(self.query_params.pop('per_page', 10))
-        self.total_count = count
+        self.total_count = count or query.count()
 
         if self.page < 1 or self.page > self.pages or self.per_page > 100:
             raise PaginationError(self)
@@ -21,6 +21,9 @@ class Pagination(object):
         self.current_page_url = self.generate_url(page=self.page, per_page=self.per_page)
         self.first_page_url = self.generate_url(page=1, per_page=self.per_page)
         self.last_page_url = self.generate_url(page=self.pages, per_page=self.per_page)
+
+        if query:
+            self.items = query.offset(self.offset).limit(self.limit).all()
 
     def generate_url(self, **pagination_params):
         param_dicts = (pagination_params,

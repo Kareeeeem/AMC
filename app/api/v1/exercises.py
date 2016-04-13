@@ -2,11 +2,11 @@ from flask import request
 
 from app import auth, db
 from app.models import Exercise, UserFavoriteExercise
-from app.serializers import ExerciseSchema
+from app.serializers import ExerciseSchema, Serializer
 from app.lib import (
+    setattr_and_return,
     AuthorizationError,
     Pagination,
-    parse_query_params,
     get_location_header,
     get_or_404,
 )
@@ -34,57 +34,45 @@ from . import v1
 @auth.token_required
 def post_exercises():
     '''Post new exercise.'''
-    schema = ExerciseSchema()
-    exercise_data = schema.load(request.get_json()).data
-    exercise_data.update(author_id=auth.current_user.id)
-    exercise = Exercise.create(db.session, exercise_data)
-    rv = schema.dump(exercise).data
-    return rv, 201, get_location_header('v1.get_exercise', id=exercise.id)
+    serializer = Serializer(ExerciseSchema, request)
+    data = dict(author_id=auth.current_user.id, **serializer.load())
+    exercise = Exercise.create(db.session, data)
+    rv = serializer.dump(exercise)
+    return rv, 201, get_location_header('.get_exercise', id=exercise.id)
 
 
 @v1.route('/exercises', methods=['GET'])
 @auth.token_optional
 def get_exercises():
     '''Get exercise collection.'''
+    serializer = Serializer(ExerciseSchema, request)
     query = Exercise.search(request.args.get('search'))
-    page = Pagination(request, query.count())
-    schema = ExerciseSchema(page=page, expand=parse_query_params(request.args, key='expand'))
 
     if not auth.current_user:
-        exercises = query.offset(page.offset).limit(page.limit).all()
-    else:
-        # We want to know which exercises the authenticated user favorited. We
-        # do an outer join to UserFavoriteExercise and add the user_id column
-        # to our results. This will add the user_id to any row that contains an
-        # exercise the user favorited, and None otherwise. The result could
-        # look something like this:
-        # [(<an exercise>, <a user id>), (<an exercise>, None)]
-        results = query.add_columns(UserFavoriteExercise.user_id).\
-            outerjoin(UserFavoriteExercise, and_(
-                UserFavoriteExercise.exercise_id == Exercise.id,
-                UserFavoriteExercise.user_id == auth.current_user.id)).\
-            offset(page.offset).limit(page.limit).all()
+        page = Pagination(request, query=query)
+        return serializer.dump_page(page)
 
-        exercises = (setattr_and_return(exercise, 'favorited', bool(user_id))
-                     for exercise, user_id in results)
-
-    return schema.dump(exercises, many=True).data
-
-
-def setattr_and_return(obj, key, value):
-    '''A setattr function that returns the object. Usefull for setting
-    attributes in expressions and comprehensions.
-    '''
-    setattr(obj, key, value)
-    return obj
+    # If a user authenticated himself we want to know which exercises the
+    # authenticated user favorited. We do an outer join to UserFavoriteExercise
+    # and add the user_id column to our results. This will add the user_id to
+    # any row that contains an exercise the user favorited, and None otherwise.
+    # The result could look something like this:
+    # [(<an exercise>, <a user id>), (<an exercise>, None)]
+    query = query.add_columns(UserFavoriteExercise.user_id).\
+        outerjoin(UserFavoriteExercise, and_(
+            UserFavoriteExercise.exercise_id == Exercise.id,
+            UserFavoriteExercise.user_id == auth.current_user.id))
+    page = Pagination(request, query=query)
+    items = (setattr_and_return(exercise, 'favorited', bool(user_id))
+             for exercise, user_id in page.items)
+    return serializer.dump_page(page, items=items)
 
 
 @v1.route('/exercises/<hashid:id>', methods=['GET'])
 def get_exercise(id):
     '''Get an exercise.'''
     exercise = get_or_404(Exercise, id)
-    schema = ExerciseSchema(expand=parse_query_params(request.args, key='expand'))
-    return schema.dump(exercise).data
+    return Serializer(ExerciseSchema, request).dump(exercise)
 
 
 @v1.route('/exercises/<hashid:id>', methods=['PUT'])
@@ -95,10 +83,9 @@ def put_exercise(id):
     if auth.current_user.id != exercise.author_id:
         raise AuthorizationError
 
-    schema = ExerciseSchema()
-    exercise_data = schema.load(request.get_json()).data
-    exercise.update(db.session, exercise_data)
-    return schema.dump(exercise).data
+    serializer = Serializer(ExerciseSchema, request)
+    exercise.update(db.session, serializer.load())
+    return serializer.dump(exercise)
 
 
 @v1.route('/exercises/<hashid:id>', methods=['DELETE'])

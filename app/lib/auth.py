@@ -94,5 +94,6 @@ class AuthorizationError(Exception):
     def __init__(self, message=None, status_code=401):
         self.message = message or "Unauthorized request"
         self.status_code = status_code
-        self.response = dict(errors=dict(status=self.status_code, message=self.message))
+        self.response = dict(errors=dict(status=self.status_code,
+                                         message=self.message))
         super(AuthorizationError, self).__init__(self.message)
