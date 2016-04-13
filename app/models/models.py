@@ -52,8 +52,6 @@ class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
 
     user_favorite_exercises = relationship(
         'UserFavoriteExercise',
-        order_by='UserFavoriteExercise.ordinal',
-        collection_class=ordering_list('ordinal'),
         cascade='all, delete-orphan',
         passive_deletes=True,
     )
@@ -101,7 +99,6 @@ class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
 
 class UserFavoriteExercise(Base):
     __tablename__ = 'user_favorite_exercise'
-    ordinal = Column(Integer)
     added = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     user_id = Column(
