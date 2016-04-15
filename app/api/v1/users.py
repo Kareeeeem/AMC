@@ -33,15 +33,15 @@ from . import v1
 @v1.route('/users', methods=['POST'])
 def post_users():
     '''Register a user.'''
-    serializer = Serializer(ProfileSchema, request)
-    user = User.create(db.session, serializer.load())
+    serializer = Serializer(ProfileSchema, request.args)
+    user = User.create(db.session, serializer.load(request.get_json()))
     return serializer.dump(user), 201, get_location_header('.get_user', id=user.id)
 
 
 @v1.route('/users', methods=['GET'])
 def get_users():
     '''Get users.'''
-    serializer = Serializer(UserSchema, request)
+    serializer = Serializer(UserSchema, request.args)
     query = User.query
     page = Pagination(request, query=query)
     return serializer.dump_page(page, exclude=('favorite_exercises',))
@@ -53,10 +53,10 @@ def get_user(id):
     '''Get a single user. '''
     if auth.current_user and auth.current_user.id == id:
         user = auth.current_user
-        serializer = Serializer(ProfileSchema, request)
+        serializer = Serializer(ProfileSchema, request.args)
     else:
         user = get_or_404(User, id)
-        serializer = Serializer(UserSchema, request)
+        serializer = Serializer(UserSchema, request.args)
 
     return serializer.dump(user)
 
@@ -65,7 +65,7 @@ def get_user(id):
 @auth.token_required
 def get_profile():
     '''Get a single user. '''
-    return Serializer(ProfileSchema, request).dump(auth.current_user)
+    return Serializer(ProfileSchema, request.args).dump(auth.current_user)
 
 
 @v1.route('/users/<hashid:id>', methods=['PUT'])
@@ -77,11 +77,12 @@ def put_user(id):
     if user.id != auth.current_user.id:
         raise AuthorizationError
 
-    serializer = Serializer(ProfileSchema, request)
+    serializer = Serializer(ProfileSchema, request.args)
     # This lets the schema validator know about the user to be updated for
     # validating unique columns. So it can ignore false positives.
     serializer.context = dict(update_id=user.id)
-    user.update(db.session, serializer.load(exclude=('password',)))
+    data = serializer.load(request.get_json(), exclude=('password',))
+    user.update(db.session, data)
     return serializer.dump(user)
 
 
@@ -101,7 +102,7 @@ def get_user_exercises(id):
     '''Get collection of exercises authored by user.'''
     query = Exercise.query.filter_by(author_id=id)
     page = Pagination(request, query=query)
-    return Serializer(ExerciseSchema, request).dump_page(page)
+    return Serializer(ExerciseSchema, request.args).dump_page(page)
 
 
 @v1.route('/users/<hashid:id>/favorites', methods=['GET'])
@@ -114,10 +115,10 @@ def get_user_favorites(id):
     query = Exercise.query.\
         join(UserFavoriteExercise).\
         filter_by(user_id=auth.current_user.id).\
-        order_by(UserFavoriteExercise.ordinal.desc())
+        order_by(UserFavoriteExercise.added.desc())
 
     page = Pagination(request, query=query)
-    return Serializer(ExerciseSchema, request).dump_page(page)
+    return Serializer(ExerciseSchema, request.args).dump_page(page)
 
 
 @v1.route('/users/<hashid:id>/favorites', methods=['POST'])
@@ -129,12 +130,10 @@ def add_to_favorites(id):
 
     data = ActionSchema().load(request.get_json()).data
     exercise = get_or_404(Exercise, data['id'])
-    if data['action'] == ActionSchema.FAVORITE:
+    if data['action'] == ActionSchema.APPEND:
         auth.current_user.favorite_exercises.append(exercise)
     else:
-        # UNFAVORITE
-        UserFavoriteExercise.query.\
-            filter_by(user_id=auth.current_user.id, exercise_id=data['id']).\
-            delete(synchronize_session=False)
+        auth.user.favorite_exercises = [ex for ex in auth.user.favorite_exercises
+                                        if ex.id != data['id']]
     db.session.commit()
     return {}, 204

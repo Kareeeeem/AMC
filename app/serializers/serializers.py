@@ -9,9 +9,9 @@ from app.lib import parse_query_params
 
 
 class Serializer(object):
-    def __init__(self, schema, request):
+    def __init__(self, schema, query_params):
         self.schema = schema
-        self.request = request
+        self.query_params = query_params
         self._context = {}
 
     @property
@@ -23,7 +23,7 @@ class Serializer(object):
         self._context = context
 
     def get_expand(self):
-        return parse_query_params(self.request.args, key='expand')
+        return parse_query_params(self.query_params, key='expand')
 
     def dump_page(self, page, items=None, **kwargs):
         schema = self.schema(page=page,
@@ -43,9 +43,9 @@ class Serializer(object):
                              **kwargs)
         return schema.dump(obj).data
 
-    def load(self, **kwargs):
+    def load(self, json, **kwargs):
         schema = self.schema(context=self.context, **kwargs)
-        return schema.load(self.request.get_json()).data
+        return schema.load(json).data
 
 
 class ExerciseSchema(Schema):
@@ -107,11 +107,11 @@ class ProfileSchema(UserSchema):
 
 
 class ActionSchema(Schema):
-    FAVORITE = 'favorite'
-    UNFAVORITE = 'unfavorite'
+    APPEND = 'favorite'
+    REMOVE = 'unfavorite'
 
     id = HashIDField(required=True)
     action = fields.Str(
         required=True,
-        validate=validate.OneOf([FAVORITE, UNFAVORITE],
+        validate=validate.OneOf([APPEND, REMOVE],
                                 error='Must be one of {choices}'))

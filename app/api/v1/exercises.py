@@ -34,8 +34,9 @@ from . import v1
 @auth.token_required
 def post_exercises():
     '''Post new exercise.'''
-    serializer = Serializer(ExerciseSchema, request)
-    data = dict(author_id=auth.current_user.id, **serializer.load())
+    serializer = Serializer(ExerciseSchema, request.args)
+    data = dict(author_id=auth.current_user.id,
+                **serializer.load(request.get_json()))
     exercise = Exercise.create(db.session, data)
     rv = serializer.dump(exercise)
     return rv, 201, get_location_header('.get_exercise', id=exercise.id)
@@ -45,7 +46,7 @@ def post_exercises():
 @auth.token_optional
 def get_exercises():
     '''Get exercise collection.'''
-    serializer = Serializer(ExerciseSchema, request)
+    serializer = Serializer(ExerciseSchema, request.args)
     query = Exercise.search(request.args.get('search'))
 
     if not auth.current_user:
@@ -72,7 +73,7 @@ def get_exercises():
 def get_exercise(id):
     '''Get an exercise.'''
     exercise = get_or_404(Exercise, id)
-    return Serializer(ExerciseSchema, request).dump(exercise)
+    return Serializer(ExerciseSchema, request.args).dump(exercise)
 
 
 @v1.route('/exercises/<hashid:id>', methods=['PUT'])
@@ -83,8 +84,8 @@ def put_exercise(id):
     if auth.current_user.id != exercise.author_id:
         raise AuthorizationError
 
-    serializer = Serializer(ExerciseSchema, request)
-    exercise.update(db.session, serializer.load())
+    serializer = Serializer(ExerciseSchema, request.args)
+    exercise.update(db.session, serializer.load(request.get_json()))
     return serializer.dump(exercise)
 
 
