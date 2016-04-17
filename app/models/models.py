@@ -40,7 +40,7 @@ class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
 
     authored_exercises = relationship(
         'Exercise',
-        backref=backref('author', lazy='joined'),
+        backref=backref('author')
     )
 
     questionnaire_responses = relationship(
@@ -109,7 +109,7 @@ class UserFavoriteExercise(Base):
         ID_TYPE,
         ForeignKey('exercise.id', ondelete='CASCADE'),
         primary_key=True)
-    exercise = relationship('Exercise', lazy='joined')
+    exercise = relationship('Exercise')
 
     def __repr__(self):
         return ('UserFavoriteExercise(user_id=%r, exercise_id=%r)' % (
@@ -128,7 +128,7 @@ class Rating(Base):
         ID_TYPE,
         ForeignKey('exercise.id', ondelete='CASCADE'),
         primary_key=True)
-    exercise = relationship('Exercise', lazy='joined')
+    exercise = relationship('Exercise')
 
     def __repr__(self):
         return ('UserFavoriteExercise(rating=%r, user_id=%r, exercise_id=%r)' % (
@@ -159,7 +159,7 @@ class Questionnaire(Base):
     )
     responses = relationship(
         'QuestionnaireResponse',
-        backref=backref('questionnaire', lazy='joined'),
+        backref=backref('questionnaire'),
         cascade='all, delete-orphan',
         passive_deletes=True,
     )
@@ -301,7 +301,6 @@ class QuestionnaireResponse(Base, CreatedUpdatedMixin):
     score = relationship(
         'Score',
         uselist=False,
-        lazy='joined',
         primaryjoin=('''
 and_(foreign(Score.questionnaire_id)==QuestionnaireResponse.questionnaire_id,
 Score.range.contains(cast(select([func.sum(Choice.value)]).

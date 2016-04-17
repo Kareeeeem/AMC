@@ -1,17 +1,18 @@
 from flask import request
 
 from app import auth, db
-from app.models import Exercise, UserFavoriteExercise
+from app.models import Exercise, UserFavoriteExercise, Rating, User
 from app.serializers import ExerciseSchema, Serializer
 from app.lib import (
-    setattr_and_return,
+    merge_sqla_results,
     AuthorizationError,
     Pagination,
     get_location_header,
     get_or_404,
 )
 
-from sqlalchemy import and_
+from sqlalchemy import func
+from sqlalchemy.orm import aliased, contains_eager
 
 from . import v1
 
@@ -46,27 +47,48 @@ def post_exercises():
 @auth.token_optional
 def get_exercises():
     '''Get exercise collection.'''
-    serializer = Serializer(ExerciseSchema, request.args)
-    query = Exercise.search(request.args.get('search'))
 
-    if not auth.current_user:
-        page = Pagination(request, query=query)
-        return serializer.dump_page(page)
+    user_id = auth.current_user.id if auth.current_user else None
 
-    # If a user authenticated himself we want to know which exercises the
-    # authenticated user favorited. We do an outer join to UserFavoriteExercise
-    # and add the user_id column to our results. This will add the user_id to
-    # any row that contains an exercise the user favorited, and None otherwise.
-    # The result could look something like this:
-    # [(<an exercise>, <a user id>), (<an exercise>, None)]
-    query = query.add_columns(UserFavoriteExercise.user_id).\
-        outerjoin(UserFavoriteExercise, and_(
-            UserFavoriteExercise.exercise_id == Exercise.id,
-            UserFavoriteExercise.user_id == auth.current_user.id))
+    # subquery for avarage rating per exercise
+    avg_rating = db.session.\
+        query(Rating.exercise_id, func.avg(Rating.rating).label('rating')).\
+        group_by(Rating.exercise_id).\
+        subquery()
+
+    # subquery for favorited exercises
+    favorited = db.session.\
+        query(UserFavoriteExercise.exercise_id).\
+        filter_by(user_id=user_id).\
+        subquery()
+
+    # query the exercises and additional info
+    query = db.session.\
+        query(Exercise, avg_rating.c.rating,
+              func.count(favorited.c.exercise_id).label('favorited')).\
+        outerjoin(avg_rating, avg_rating.c.exercise_id == Exercise.id).\
+        outerjoin(favorited, favorited.c.exercise_id == Exercise.id)
+
+    # apply the search filter
+    query = Exercise.search(request.args.get('search'), query=query)
+
+    # join the author
+    if True:
+        # TODO if expand author
+        authoralias = aliased(User)
+        query = query.\
+            join(authoralias, Exercise.author).\
+            options(contains_eager(Exercise.author, alias=authoralias)).\
+            group_by(authoralias)
+
+    # or not
+    else:
+        query = query.group_by(Exercise, avg_rating.c.rating)
+
     page = Pagination(request, query=query)
-    items = (setattr_and_return(exercise, 'favorited', bool(user_id))
-             for exercise, user_id in page.items)
-    return serializer.dump_page(page, items=items)
+
+    serializer = Serializer(ExerciseSchema, request.args)
+    return serializer.dump_page(page, items=merge_sqla_results(page.items))
 
 
 @v1.route('/exercises/<hashid:id>', methods=['GET'])

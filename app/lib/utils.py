@@ -6,12 +6,34 @@ import inspect
 from flask import url_for, current_app, Response, jsonify, abort
 
 
+class Enum(frozenset):
+    '''A ghetto Enum implementation. A set that allows attribute access.
+    '''
+    def __getattr__(self, name):
+        if name in self:
+            return name
+        raise AttributeError
+
+
 def setattr_and_return(obj, key, value):
     '''A setattr function that returns the object. Usefull for setting
     attributes in expressions and comprehensions.
     '''
     setattr(obj, key, value)
     return obj
+
+
+def merge_sqla_results(rows):
+    '''Merges an SQLAlchemy result. SQLAlchemy returns lists of namedtuples.
+    For example a tuple with the items UserObject, attr1, attr2. This function
+    is usefull for setting attr1 and attr2 on the UserObject.
+
+    Returns a generator.
+    '''
+    for row in rows:
+        for field in row._fields[1:]:
+            setattr(row[0], field, getattr(row, field))
+        yield row[0]
 
 
 def parse_query_params(params, key):

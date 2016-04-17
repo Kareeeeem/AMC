@@ -49,21 +49,22 @@ class Serializer(object):
 
 
 class ExerciseSchema(Schema):
-    id = HashIDField()
+    id = HashIDField(dump_only=True)
     title = fields.Str(required=True)
     description = fields.Str(required=True)
     data = fields.Dict()
     href = FlaskUrlField(route='v1.get_exercise',
                          route_args={'id': 'id'},
                          dump_only=True)
-    author = ExpandableNested('UserSchema')
+    author = ExpandableNested('UserSchema', only=('username', 'href'))
 
-    favorited = fields.Bool()
+    favorited = fields.Bool(dump_only=True)
+    rating = fields.Float()
     allow_edit = fields.Bool()
 
-    class Meta:
-        additional = ('created_at', 'updated_at')
-        dump_only = ('created_at', 'updated_at', 'favorited', 'id')
+    # class Meta:
+    #     additional = ('created_at', 'updated_at')
+    #     dump_only = ('created_at', 'updated_at', 'favorited', 'id')
 
 
 class UserSchema(Schema):
@@ -102,8 +103,8 @@ class ProfileSchema(UserSchema):
 
     class Meta:
         load_only = ('password',)
-        additional = ('created_at', 'updated_at', 'last_login')
-        dump_only = ('created_at', 'updated_at', 'last_login')
+        # additional = ('created_at', 'updated_at', 'last_login')
+        # dump_only = ('created_at', 'updated_at', 'last_login')
 
 
 class ActionSchema(Schema):
