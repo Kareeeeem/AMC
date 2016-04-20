@@ -35,7 +35,8 @@ def post_users():
     '''Register a user.'''
     serializer = Serializer(ProfileSchema, request.args)
     user = User.create(db.session, serializer.load(request.get_json()))
-    return serializer.dump(user), 201, get_location_header('.get_user', id=user.id)
+    rv = serializer.dump(user)
+    return rv, 201, get_location_header('.get_user', id=user.id)
 
 
 @v1.route('/users', methods=['GET'])
@@ -44,7 +45,7 @@ def get_users():
     serializer = Serializer(UserSchema, request.args)
     query = User.query
     page = Pagination(request, query=query)
-    return serializer.dump_page(page, exclude=('favorite_exercises',))
+    return serializer.dump_page(page)
 
 
 @v1.route('/users/<hashid:id>', methods=['GET'])
@@ -133,7 +134,7 @@ def add_to_favorites(id):
     if data['action'] == ActionSchema.APPEND:
         auth.current_user.favorite_exercises.append(exercise)
     else:
-        auth.user.favorite_exercises = [ex for ex in auth.user.favorite_exercises
-                                        if ex.id != data['id']]
+        auth.current_user.favorite_exercises = [ex for ex in auth.current_user.favorite_exercises
+                                                if ex.id != data['id']]
     db.session.commit()
     return {}, 204

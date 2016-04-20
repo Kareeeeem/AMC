@@ -1,6 +1,7 @@
 import math
 
 from flask import url_for
+from utils import merge_sqla_results
 
 
 class Pagination(object):
@@ -23,7 +24,8 @@ class Pagination(object):
         self.last_page_url = self.generate_url(page=self.pages, per_page=self.per_page)
 
         if query:
-            self.items = query.offset(self.offset).limit(self.limit).all()
+            items = query.offset(self.offset).limit(self.limit).all()
+            self.items = merge_sqla_results(items)
 
     def generate_url(self, **pagination_params):
         param_dicts = (pagination_params,

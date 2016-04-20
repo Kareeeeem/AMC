@@ -26,9 +26,8 @@ def setattr_and_return(obj, key, value):
 def merge_sqla_results(rows):
     '''Merges an SQLAlchemy result. SQLAlchemy returns lists of namedtuples.
     For example a tuple with the items UserObject, attr1, attr2. This function
-    is usefull for setting attr1 and attr2 on the UserObject.
-
-    Returns a generator.
+    is usefull for setting attr1 and attr2 on the UserObject and then returning
+    an iterable of UserObjects.
     '''
     for row in rows:
         for field in row._fields[1:]:

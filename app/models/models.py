@@ -375,6 +375,43 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
 
     __table_args__ = Index('ix_exercise_tsv', 'tsv', postgresql_using='gin'),
 
+    @staticmethod
+    def with_rating(session, query):
+        '''Returns the query with the average rating as an additional column.
+        It's important to not that the SQLAlchemy results will be an iterable
+        of tuples, instead of an iterable of Exercises.
+        '''
+        avg_rating = session.\
+            query(Rating.exercise_id, func.avg(Rating.rating).label('rating')).\
+            group_by(Rating.exercise_id).\
+            subquery()
+
+        query = query.add_columns(avg_rating.c.rating).\
+            outerjoin(avg_rating, avg_rating.c.exercise_id == Exercise.id).\
+            group_by(Exercise, avg_rating.c.rating)
+
+        return query
+
+    @staticmethod
+    def with_favorited_by(session, query, favorited_by_user_id):
+        '''Returns the query with the favorited additional column, which will
+        be 1 or 0.  It's important to not that the SQLAlchemy results will be
+        an iterable of tuples, instead of an iterable of Exercises.
+        '''
+
+        # subquery for favorited exercises
+        favorited = session.\
+            query(UserFavoriteExercise.exercise_id).\
+            filter_by(user_id=favorited_by_user_id).\
+            subquery()
+
+        # query the exercises and additional info
+        query = query.\
+            add_columns(func.count(favorited.c.exercise_id).label('favorited')).\
+            outerjoin(favorited, favorited.c.exercise_id == Exercise.id)
+
+        return query
+
     @classmethod
     def search(cls, search_terms, query=None):
         # TODO support more complex queries

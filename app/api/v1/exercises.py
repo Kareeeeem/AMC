@@ -1,21 +1,19 @@
 from flask import request
 
 from app import auth, db
-from app.models import Exercise, UserFavoriteExercise, Rating, User
+from app.models import Exercise, User
 from app.serializers import ExerciseSchema, Serializer
 from app.lib import (
-    merge_sqla_results,
+    parse_query_params,
     AuthorizationError,
     Pagination,
     get_location_header,
     get_or_404,
 )
 
-from sqlalchemy import func
 from sqlalchemy.orm import aliased, contains_eager
 
 from . import v1
-
 
 # EXERCISE ENDPOINTS
 # ==================
@@ -50,45 +48,21 @@ def get_exercises():
 
     user_id = auth.current_user.id if auth.current_user else None
 
-    # subquery for avarage rating per exercise
-    avg_rating = db.session.\
-        query(Rating.exercise_id, func.avg(Rating.rating).label('rating')).\
-        group_by(Rating.exercise_id).\
-        subquery()
+    query = Exercise.search(request.args.get('search'))
+    query = Exercise.with_rating(db.session, query)
+    query = Exercise.with_favorited_by(db.session, query, user_id)
 
-    # subquery for favorited exercises
-    favorited = db.session.\
-        query(UserFavoriteExercise.exercise_id).\
-        filter_by(user_id=user_id).\
-        subquery()
-
-    # query the exercises and additional info
-    query = db.session.\
-        query(Exercise, avg_rating.c.rating,
-              func.count(favorited.c.exercise_id).label('favorited')).\
-        outerjoin(avg_rating, avg_rating.c.exercise_id == Exercise.id).\
-        outerjoin(favorited, favorited.c.exercise_id == Exercise.id)
-
-    # apply the search filter
-    query = Exercise.search(request.args.get('search'), query=query)
-
-    # join the author
-    if True:
-        # TODO if expand author
-        authoralias = aliased(User)
+    if 'author' in parse_query_params(request.args, 'author'):
+        author_alias = aliased(User)
         query = query.\
-            join(authoralias, Exercise.author).\
-            options(contains_eager(Exercise.author, alias=authoralias)).\
-            group_by(authoralias)
-
-    # or not
-    else:
-        query = query.group_by(Exercise, avg_rating.c.rating)
+            outerjoin(author_alias, Exercise.author).\
+            options(contains_eager(Exercise.author, alias=author_alias)).\
+            group_by(author_alias)
 
     page = Pagination(request, query=query)
 
     serializer = Serializer(ExerciseSchema, request.args)
-    return serializer.dump_page(page, items=merge_sqla_results(page.items))
+    return serializer.dump_page(page)
 
 
 @v1.route('/exercises/<hashid:id>', methods=['GET'])
