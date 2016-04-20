@@ -375,8 +375,8 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
 
     __table_args__ = Index('ix_exercise_tsv', 'tsv', postgresql_using='gin'),
 
-    @staticmethod
-    def with_rating(session, query):
+    @classmethod
+    def with_rating(cls, session, query, order_by=False):
         '''Returns the query with the average rating as an additional column.
         It's important to not that the SQLAlchemy results will be an iterable
         of tuples, instead of an iterable of Exercises.
@@ -387,13 +387,16 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
             subquery()
 
         query = query.add_columns(avg_rating.c.rating).\
-            outerjoin(avg_rating, avg_rating.c.exercise_id == Exercise.id).\
-            group_by(Exercise, avg_rating.c.rating)
+            outerjoin(avg_rating, avg_rating.c.exercise_id == cls.id).\
+            group_by(cls, avg_rating.c.rating)
+
+        if order_by:
+            query = query.order_by(avg_rating.c.rating.desc())
 
         return query
 
-    @staticmethod
-    def with_favorited_by(session, query, favorited_by_user_id):
+    @classmethod
+    def with_favorited_by(cls, session, query, favorited_by_user_id):
         '''Returns the query with the favorited additional column, which will
         be 1 or 0.  It's important to not that the SQLAlchemy results will be
         an iterable of tuples, instead of an iterable of Exercises.
@@ -408,21 +411,23 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
         # query the exercises and additional info
         query = query.\
             add_columns(func.count(favorited.c.exercise_id).label('favorited')).\
-            outerjoin(favorited, favorited.c.exercise_id == Exercise.id)
+            outerjoin(favorited, favorited.c.exercise_id == cls.id)
 
         return query
 
     @classmethod
-    def search(cls, search_terms, query=None):
+    def search(cls, search_terms, query, order_by=False):
         # TODO support more complex queries
-        # only support AND queries for now
-        if not query:
-            query = cls.query
+        # only support OR queries for now
+        # See pg docs http://www.postgresql.org/docs/9.5/static/textsearch.html
 
         if search_terms:
-            search_terms = (' & ').join(search_terms.split())
-            query = query.filter(cls.tsv.match(search_terms)).\
-                order_by(func.ts_rank(cls.tsv, func.to_tsquery(search_terms)).desc())
+            search_terms = (' | ').join(search_terms.split())
+            query = query.filter(cls.tsv.match(search_terms))
+
+            if order_by:
+                query = query.order_by(
+                    func.ts_rank(cls.tsv, func.to_tsquery(search_terms)).desc())
 
         return query
 

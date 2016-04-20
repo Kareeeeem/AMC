@@ -46,13 +46,20 @@ def post_exercises():
 def get_exercises():
     '''Get exercise collection.'''
 
-    user_id = auth.current_user.id if auth.current_user else None
+    # possible order_by's: rating, relevance, added (default)
+    order_by = request.args.get('order_by', 'added')
 
-    query = Exercise.search(request.args.get('search'))
-    query = Exercise.with_rating(db.session, query)
-    query = Exercise.with_favorited_by(db.session, query, user_id)
+    # Initial query with the default ordering
+    query = Exercise.query.order_by(Exercise.created_at.desc())
+    query = Exercise.with_rating(db.session, query, order_by=order_by == 'rating')
 
-    if 'author' in parse_query_params(request.args, 'author'):
+    search_params = request.args.get('search')
+    query = Exercise.search(search_params, query, order_by == 'search')
+
+    if auth.current_user:
+        query = Exercise.with_favorited_by(db.session, query, auth.current_user.id)
+
+    if 'author' in parse_query_params(request.args, 'extend'):
         author_alias = aliased(User)
         query = query.\
             outerjoin(author_alias, Exercise.author).\
