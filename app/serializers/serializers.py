@@ -9,7 +9,7 @@ from app.lib import parse_query_params
 
 
 class Serializer(object):
-    def __init__(self, schema, query_params):
+    def __init__(self, schema, query_params=None):
         self.schema = schema
         self.query_params = query_params
         self._context = {}
@@ -23,7 +23,8 @@ class Serializer(object):
         self._context = context
 
     def get_expand(self):
-        return parse_query_params(self.query_params, key='expand')
+        if self.query_params:
+            return parse_query_params(self.query_params, key='expand')
 
     def dump_page(self, page, items=None, **kwargs):
         schema = self.schema(page=page,

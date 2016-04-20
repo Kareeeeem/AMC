@@ -24,15 +24,21 @@ def setattr_and_return(obj, key, value):
 
 
 def merge_sqla_results(rows):
-    '''Merges an SQLAlchemy result. SQLAlchemy returns lists of namedtuples.
-    For example a tuple with the items UserObject, attr1, attr2. This function
-    is usefull for setting attr1 and attr2 on the UserObject and then returning
-    an iterable of UserObjects.
+    '''Merges an SQLAlchemy result. SQLAlchemy returns lists of namedtuples
+    when you specify additional columns.  For example a tuple with the items
+    UserObject, attr1, attr2. This function is usefull for setting attr1 and
+    attr2 on the UserObject and then returning an iterable of UserObjects.
+
+    Works for common objects aswell but is written for the usecase above.
     '''
     for row in rows:
-        for field in row._fields[1:]:
-            setattr(row[0], field, getattr(row, field))
-        yield row[0]
+        try:
+            for field in row._fields[1:]:
+                setattr(row[0], field, getattr(row, field))
+            yield row[0]
+        except AttributeError:
+            # rows is just a normal iterable of class instances
+            yield row
 
 
 def parse_query_params(params, key):
