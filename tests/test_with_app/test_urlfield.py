@@ -2,10 +2,10 @@ from flask import url_for
 from app.serializers import UserSchema, ExerciseSchema
 
 
-def test_url_field(user, session):
-    s = UserSchema(only=('href',))
-    rv = s.dump(user).data
-    assert rv == dict(href=url_for('v1.get_user', id=user.id))
+# def test_url_field(user, session):
+#     s = UserSchema(only=('href',))
+#     rv = s.dump(user).data
+#     assert rv == dict(href=url_for('v1.get_user', id=user.id))
 
 
 def test_nested_field_collapsed(user, exercise, session):

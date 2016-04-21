@@ -11,7 +11,6 @@ from app.lib import (
     AuthorizationError,
     get_location_header,
     get_or_404,
-    Pagination,
 )
 
 from . import v1
@@ -37,13 +36,13 @@ def post_users():
     return rv, 201, get_location_header('.get_user', id=user.id)
 
 
-@v1.route('/users', methods=['GET'])
-def get_users():
-    '''Get users.'''
-    serializer = Serializer(UserSchema, request.args)
-    query = User.query
-    page = Pagination(request, query=query)
-    return serializer.dump_page(page)
+# @v1.route('/users', methods=['GET'])
+# def get_users():
+#     '''Get users.'''
+#     serializer = Serializer(UserSchema, request.args)
+#     query = User.query
+#     page = Pagination(request, query=query)
+#     return serializer.dump_page(page)
 
 
 @v1.route('/users/<hashid:id>', methods=['GET'])
@@ -60,11 +59,11 @@ def get_user(id):
     return serializer.dump(user)
 
 
-@v1.route('/users/profile', methods=['GET'])
-@auth.token_required
-def get_profile():
-    '''Get a single user. '''
-    return Serializer(ProfileSchema, request.args).dump(auth.current_user)
+# @v1.route('/users/profile', methods=['GET'])
+# @auth.token_required
+# def get_profile():
+#     '''Get a single user. '''
+#     return Serializer(ProfileSchema, request.args).dump(auth.current_user)
 
 
 @v1.route('/users/<hashid:id>', methods=['PUT'])

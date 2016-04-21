@@ -12,7 +12,7 @@ from werkzeug.datastructures import MultiDict
 # will request from it.
 class FakeUrlRule(object):
     def __init__(self, endpoint):
-        self.endpoint = endpoint or 'v1.get_users'
+        self.endpoint = endpoint or 'v1.get_exercises'
 
 
 class FakeRequest(object):

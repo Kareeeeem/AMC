@@ -1,8 +1,8 @@
 from flask import request
-from sqlalchemy.orm import contains_eager
+from sqlalchemy.orm import subqueryload
 
 from app import auth, db
-from app.models import Exercise, User
+from app.models import Exercise
 from app.serializers import ExerciseSchema, Serializer, ActionSchema
 from app.lib import (
     parse_query_params,
@@ -50,15 +50,9 @@ def get_exercises(favorited_by=None, author_id=None):
 
     user_id = auth.current_user.id if auth.current_user else None
 
-    # client requests favorites that are not his
+    # client requests favorites that are not his.
     if favorited_by and favorited_by != user_id:
         raise AuthorizationError
-    # client request own favorites
-    elif favorited_by and favorited_by == user_id:
-        ownfavorites = True
-    # client requests the general exercise collection
-    else:
-        ownfavorites = False
 
     search_params = request.args.get('search')
     order_by = request.args.get('order_by', 'added')
@@ -69,15 +63,16 @@ def get_exercises(favorited_by=None, author_id=None):
     query = query.order_by(Exercise.created_at.desc())
 
     if user_id:
-        query = Exercise.with_favorited(query, user_id, ownfavorites=ownfavorites)
+        query = Exercise.with_rating(query, auth.current_user.id)
+        # if favorited_by is set then we want only the authenticated users
+        # own favorites
+        query = Exercise.with_favorited(query, user_id, ownfavorites=bool(favorited_by))
 
     if author_id:
         query = query.filter(Exercise.author_id == author_id)
 
-    if 'author' in parse_query_params(request.args, 'extend'):
-        query = query.\
-            outerjoin(User, Exercise.author).\
-            options(contains_eager(Exercise.author))
+    if 'author' in parse_query_params(request.args, key='expand'):
+        query = query.options(subqueryload(Exercise.author))
 
     page = Pagination(request, query=query)
     return Serializer(ExerciseSchema, request.args).dump_page(page)
@@ -92,11 +87,12 @@ def add_to_favorites(id):
 
     data = ActionSchema().load(request.get_json()).data
     exercise = get_or_404(Exercise, data['id'])
-    if data['action'] == ActionSchema.APPEND:
+    if data['action'] == ActionSchema.FAVORITE:
         auth.current_user.favorite_exercises.append(exercise)
     else:
-        auth.current_user.favorite_exercises = [ex for ex in auth.current_user.favorite_exercises
-                                                if ex.id != data['id']]
+        auth.current_user.favorite_exercises = [
+            ex for ex in auth.current_user.favorite_exercises if ex.id != data['id']]
+
     db.session.commit()
     return {}, 204
 
@@ -105,7 +101,8 @@ def add_to_favorites(id):
 def get_exercise(id):
     '''Get an exercise.'''
     exercise = get_or_404(Exercise, id)
-    return Serializer(ExerciseSchema, request.args).dump(exercise)
+    serializer = Serializer(ExerciseSchema, request.args)
+    return serializer.dump(exercise)
 
 
 @v1.route('/exercises/<hashid:id>', methods=['PUT'])

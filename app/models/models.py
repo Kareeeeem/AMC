@@ -30,6 +30,9 @@ ID_TYPE = Integer
 Base = db.Base
 
 
+# Relationships do not have any loading stategies configured aside from
+# exercise > category. Watch out for N+1 queries.
+
 class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
     id = IDColumn()
     password = PasswordColumn()
@@ -40,7 +43,7 @@ class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
 
     authored_exercises = relationship(
         'Exercise',
-        backref=backref('author')
+        backref=backref('author'),
     )
 
     questionnaire_responses = relationship(
@@ -136,6 +139,164 @@ class Rating(Base):
             self.user_id,
             self.exercise_id,
         ))
+
+
+class Category(Base):
+    id = IDColumn()
+    name = Column(String, nullable=False)
+
+
+class MaxEditTimeExpiredError(Exception):
+    pass
+
+
+class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
+    MAX_EDIT_TIME = timedelta(hours=3)
+
+    id = IDColumn()
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    data = Column(JSONB)
+    tsv = Column(TSVECTOR)
+    author_id = Column(ID_TYPE, ForeignKey('user.id'))
+
+    category_id = Column(ID_TYPE, ForeignKey('category.id'))
+    category = relationship(
+        'Category',
+        backref='exercises',
+        # we always want this but joinedload doesn't play nice with
+        # some of the more complicated queries we're doing.
+        lazy='subquery',
+    )
+
+    @property
+    def category_(self):
+        return self.category.name
+
+    __table_args__ = Index('ix_exercise_tsv', 'tsv', postgresql_using='gin'),
+
+    @classmethod
+    def with_rating(cls, query, user_id):
+        '''Returns the query with the average rating as an additional column.
+        It's important to not that the SQLAlchemy results will be an iterable
+        of tuples, instead of an iterable of Exercises.
+        '''
+
+        rating = query.session.\
+            query(Rating.exercise_id, Rating.rating).\
+            filter(Rating.user_id == user_id).\
+            subquery()
+
+        query = query.add_columns(rating.c.rating).\
+            outerjoin(rating, rating.c.exercise_id == cls.id).\
+            group_by(rating.c.rating)
+
+        return query
+
+    @classmethod
+    def with_avg_rating(cls, query, order_by=False):
+        '''Returns the query with the average rating as an additional column.
+        It's important to not that the SQLAlchemy results will be an iterable
+        of tuples, instead of an iterable of Exercises.
+        '''
+
+        avg_rating = query.session.\
+            query(Rating.exercise_id, func.avg(Rating.rating).label('avg_rating')).\
+            group_by(Rating.exercise_id).\
+            subquery()
+
+        query = query.add_columns(avg_rating.c.avg_rating).\
+            outerjoin(avg_rating, avg_rating.c.exercise_id == cls.id).\
+            group_by(cls, avg_rating.c.avg_rating)
+
+        if order_by:
+            query = query.order_by(nullslast(avg_rating.c.avg_rating.desc()))
+
+        return query
+
+    @classmethod
+    def with_favorited(cls, query, user_id, ownfavorites=False):
+        '''Returns the query with the favorited additional column, which will
+        be 1 or 0.  It's important to not that the SQLAlchemy results will be
+        an iterable of tuples, instead of an iterable of Exercises.
+        '''
+
+        isouter = False if ownfavorites else True
+
+        favorited = query.session.\
+            query(UserFavoriteExercise.exercise_id).\
+            filter_by(user_id=user_id).\
+            subquery()
+
+        return query.\
+            add_columns(func.count(favorited.c.exercise_id).label('favorited')).\
+            join(favorited, favorited.c.exercise_id == cls.id, isouter=isouter)
+
+    @classmethod
+    def search(cls, search_terms, query, order_by=False):
+        # TODO support more complex queries
+        # only support OR queries for now
+        # See pg docs http://www.postgresql.org/docs/9.5/static/textsearch.html
+
+        if search_terms:
+            search_terms = (' | ').join(search_terms.split())
+            query = query.filter(cls.tsv.match(search_terms))
+
+            if order_by:
+                query = query.order_by(
+                    func.ts_rank(cls.tsv, func.to_tsquery(search_terms)).desc())
+
+        return query
+
+    @property
+    def edit_allowed(self):
+        '''Only allow edits if exercise is no older than MAX_EDIT_TIME.'''
+        return (datetime.utcnow() - self.created_at) < self.MAX_EDIT_TIME
+
+    def update(self, session, data, commit=True):
+        if not self.edit_allowed:
+            raise MaxEditTimeExpiredError
+
+        return super(Exercise, self).update(session, data, commit=commit)
+
+    def __repr__(self):
+        return ('Exercise(id=%r, title=%r, description=%r, data=%r, '
+                'author_id=%r, created_at=%r, updated_at=%r)' % (
+                    self.id,
+                    self.title,
+                    self.description,
+                    self.data,
+                    self.author_id,
+                    self.created_at,
+                    self.updated_at,
+                ))
+
+
+# This is used for full text search. The application will be in
+# dutch, hence the dutch config values for to_tsvector. Also make sure the
+# `default_text_search_config` is set to dutch in the application database.
+drop_ts_vector_ddl = 'DROP FUNCTION IF EXISTS exercise_trigger()'
+ts_vector_ddl = '''
+CREATE OR REPLACE FUNCTION exercise_trigger() RETURNS trigger AS $$
+begin
+  new.tsv :=
+    setweight(to_tsvector('pg_catalog.dutch', coalesce(new.title,'')), 'A') ||
+    setweight(to_tsvector('pg_catalog.dutch', coalesce(new.description,'')), 'B');
+  return new;
+end
+$$ LANGUAGE plpgsql;
+'''
+
+drop_exercise_trigger_ddl = 'DROP TRIGGER IF EXISTS tsvectorupdate ON %(table)s'
+exercise_trigger_ddl = '''
+CREATE TRIGGER tsvectorupdate BEFORE INSERT OR UPDATE
+ON %(table)s FOR EACH ROW EXECUTE PROCEDURE exercise_trigger()
+'''
+
+event.listen(Exercise.__table__, 'after_create', DDL(ts_vector_ddl))
+event.listen(Exercise.__table__, 'after_create', DDL(exercise_trigger_ddl))
+event.listen(Exercise.__table__, 'before_drop', DDL(drop_exercise_trigger_ddl))
+event.listen(Exercise.__table__, 'before_drop', DDL(drop_ts_vector_ddl))
 
 
 class Questionnaire(Base):
@@ -339,162 +500,6 @@ where(Choice.response_id == QuestionnaireResponse.id).as_scalar(), Integer)))
                     self.created_at,
                     self.updated_at,
                 ))
-
-
-class Category(Base):
-    id = IDColumn()
-    name = Column(String, nullable=False)
-
-
-class MaxEditTimeExpiredError(Exception):
-    pass
-
-
-class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
-    MAX_EDIT_TIME = timedelta(hours=3)
-
-    id = IDColumn()
-    title = Column(String, nullable=False)
-    description = Column(Text, nullable=False)
-    data = Column(JSONB)
-    tsv = Column(TSVECTOR)
-    author_id = Column(ID_TYPE, ForeignKey('user.id'))
-
-    category_id = Column(ID_TYPE, ForeignKey('category.id'))
-    category = relationship(
-        'Category',
-        backref='exercises',
-        lazy='subquery',
-    )
-
-    @property
-    def category_(self):
-        return self.category.name
-
-    __table_args__ = Index('ix_exercise_tsv', 'tsv', postgresql_using='gin'),
-
-    @classmethod
-    def with_rating(cls, query, user_id):
-        '''Returns the query with the average rating as an additional column.
-        It's important to not that the SQLAlchemy results will be an iterable
-        of tuples, instead of an iterable of Exercises.
-        '''
-
-        rating = query.session.\
-            query(Rating.exercise_id, Rating.rating).\
-            filter(Rating.user_id == user_id).\
-            subquery()
-
-        query = query.add_columns(rating.c.rating).\
-            outerjoin(rating, rating.c.exercise_id == cls.id).\
-            group_by(rating.c.rating)
-
-        return query
-
-    @classmethod
-    def with_avg_rating(cls, query, order_by=False):
-        '''Returns the query with the average rating as an additional column.
-        It's important to not that the SQLAlchemy results will be an iterable
-        of tuples, instead of an iterable of Exercises.
-        '''
-
-        avg_rating = query.session.\
-            query(Rating.exercise_id, func.avg(Rating.rating).label('avg_rating')).\
-            group_by(Rating.exercise_id).\
-            subquery()
-
-        query = query.add_columns(avg_rating.c.avg_rating).\
-            outerjoin(avg_rating, avg_rating.c.exercise_id == cls.id).\
-            group_by(cls, avg_rating.c.avg_rating)
-
-        if order_by:
-            query = query.order_by(nullslast(avg_rating.c.avg_rating.desc()))
-
-        return query
-
-    @classmethod
-    def with_favorited(cls, query, user_id, ownfavorites=False):
-        '''Returns the query with the favorited additional column, which will
-        be 1 or 0.  It's important to not that the SQLAlchemy results will be
-        an iterable of tuples, instead of an iterable of Exercises.
-        '''
-
-        isouter = False if ownfavorites else True
-
-        favorited = query.session.\
-            query(UserFavoriteExercise.exercise_id).\
-            filter_by(user_id=user_id).\
-            subquery()
-
-        return query.\
-            add_columns(func.count(favorited.c.exercise_id).label('favorited')).\
-            join(favorited, favorited.c.exercise_id == cls.id, isouter=isouter)
-
-    @classmethod
-    def search(cls, search_terms, query, order_by=False):
-        # TODO support more complex queries
-        # only support OR queries for now
-        # See pg docs http://www.postgresql.org/docs/9.5/static/textsearch.html
-
-        if search_terms:
-            search_terms = (' | ').join(search_terms.split())
-            query = query.filter(cls.tsv.match(search_terms))
-
-            if order_by:
-                query = query.order_by(
-                    func.ts_rank(cls.tsv, func.to_tsquery(search_terms)).desc())
-
-        return query
-
-    @property
-    def edit_allowed(self):
-        '''Only allow edits if exercise is no older than MAX_EDIT_TIME.'''
-        return (datetime.utcnow() - self.created_at) < self.MAX_EDIT_TIME
-
-    def update(self, session, data, commit=True):
-        if not self.edit_allowed:
-            raise MaxEditTimeExpiredError
-
-        return super(Exercise, self).update(session, data, commit=commit)
-
-    def __repr__(self):
-        return ('Exercise(id=%r, title=%r, description=%r, data=%r, '
-                'author_id=%r, created_at=%r, updated_at=%r)' % (
-                    self.id,
-                    self.title,
-                    self.description,
-                    self.data,
-                    self.author_id,
-                    self.created_at,
-                    self.updated_at,
-                ))
-
-
-# This is used for full text search. The application will be in
-# dutch, hence the dutch config values for to_tsvector. Also make sure the
-# `default_text_search_config` is set to dutch in the application database.
-drop_ts_vector_ddl = 'DROP FUNCTION IF EXISTS exercise_trigger()'
-ts_vector_ddl = '''
-CREATE OR REPLACE FUNCTION exercise_trigger() RETURNS trigger AS $$
-begin
-  new.tsv :=
-    setweight(to_tsvector('pg_catalog.dutch', coalesce(new.title,'')), 'A') ||
-    setweight(to_tsvector('pg_catalog.dutch', coalesce(new.description,'')), 'B');
-  return new;
-end
-$$ LANGUAGE plpgsql;
-'''
-
-drop_exercise_trigger_ddl = 'DROP TRIGGER IF EXISTS tsvectorupdate ON %(table)s'
-exercise_trigger_ddl = '''
-CREATE TRIGGER tsvectorupdate BEFORE INSERT OR UPDATE
-ON %(table)s FOR EACH ROW EXECUTE PROCEDURE exercise_trigger()
-'''
-
-event.listen(Exercise.__table__, 'after_create', DDL(ts_vector_ddl))
-event.listen(Exercise.__table__, 'after_create', DDL(exercise_trigger_ddl))
-event.listen(Exercise.__table__, 'before_drop', DDL(drop_exercise_trigger_ddl))
-event.listen(Exercise.__table__, 'before_drop', DDL(drop_ts_vector_ddl))
 
 
 __all__ = [

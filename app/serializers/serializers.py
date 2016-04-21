@@ -1,11 +1,16 @@
+from flask import url_for
 from marshmallow import fields, validate, validates_schema
 
 from meta import Schema
-from fields import HashIDField, FlaskUrlField, ExpandableNested
+from fields import HashIDField
 from validators import validate_unique
 
 from app import models
 from app.lib import parse_query_params
+
+
+def generate_url(route, **kwargs):
+    return url_for(route, _external=True, **kwargs)
 
 
 class Serializer(object):
@@ -26,16 +31,11 @@ class Serializer(object):
         if self.query_params:
             return parse_query_params(self.query_params, key='expand')
 
-    def dump_page(self, page, items=None, **kwargs):
+    def dump_page(self, page, **kwargs):
         schema = self.schema(page=page,
                              context=self.context,
                              expand=self.get_expand(),
                              **kwargs)
-        if items:
-            # the caller wants a bit more control over what he passes in.
-            # Perhaps he ran some postprocessing on the items stored in page.
-            return schema.dump(items, many=True).data
-
         return schema.dump(page.items, many=True).data
 
     def dump(self, obj, **kwargs):
@@ -55,49 +55,61 @@ class ExerciseSchema(Schema):
     description = fields.Str(required=True)
     data = fields.Dict()
     category_ = fields.Str(dump_only=True)
-    href = FlaskUrlField(route='v1.get_exercise',
-                         route_args={'id': 'id'},
-                         dump_only=True)
-    author = ExpandableNested('UserSchema', only=('username', 'href'))
-
     favorited = fields.Bool(dump_only=True)
     avg_rating = fields.Float()
+    my_rating = fields.Float(attribute='rating')
     allow_edit = fields.Bool()
+    href = fields.Function(lambda o: generate_url('v1.get_exercise', id=o.id))
+    author = fields.Method('get_author')
 
-    # class Meta:
-    #     additional = ('created_at', 'updated_at')
-    #     dump_only = ('created_at', 'updated_at', 'favorited', 'id')
+    def get_author(self, obj):
+        if 'author' not in self.expand:
+            return generate_url('v1.get_user', id=obj.author_id)
+        else:
+            return fields.Nested(UserSchema).serialize('author', obj)
+
+    class Meta:
+        additional = ('created_at',
+                      'updated_at',
+                      )
+        dump_only = ('created_at',
+                     'updated_at',
+                     'author',
+                     'href',
+                     )
 
 
 class UserSchema(Schema):
     id = HashIDField(dump_only=True)
     username = fields.Str(required=True)
+    authored_exercises = fields.Method('get_authored')
+    href = fields.Function(lambda o: generate_url('v1.get_user', id=o.id))
 
-    href = FlaskUrlField(
-        route='v1.get_user',
-        route_args={'id': 'id'},
-        dump_only=True)
+    def get_authored(self, obj):
+        if 'authored_exercises' not in self.expand:
+            return generate_url('v1.get_exercises', author_id=obj.id)
 
-    authored_exercises = ExpandableNested(
-        'ExerciseSchema',
-        collection_route='v1.get_exercises',
-        route_arg_keys={'author_id': 'id'},
-        exclude=('author',),
-        dump_only=True,
-        many=True,
-    )
+        field = fields.Nested(ExerciseSchema, many=True)
+        return field.serialize('authored_exercises', obj)
+
+    class Meta:
+        dump_only = ('authored_exercises',
+                     'href',
+                     )
 
 
 class ProfileSchema(UserSchema):
     email = fields.Email()
     password = fields.Str(required=True, validate=validate.Length(min=8))
-    favorite_exercises = ExpandableNested(
-        'ExerciseSchema',
-        collection_route='v1.get_exercises',
-        route_arg_keys={'favorited_by': 'id'},
-        dump_only=True,
-        many=True,
-    )
+    favorite_exercises = fields.Method('get_favorites')
+    href = fields.Function(lambda o: generate_url('v1.get_user', id=o.id))
+
+    def get_favorites(self, obj):
+        if 'favorite_exercises' not in self.expand:
+            return generate_url('v1.get_exercises', favorited_by=obj.id)
+
+        field = fields.Nested(ExerciseSchema, many=True)
+        return field.serialize('favorite_exercises', obj)
 
     @validates_schema
     def validate(self, data):
@@ -105,16 +117,25 @@ class ProfileSchema(UserSchema):
 
     class Meta:
         load_only = ('password',)
-        # additional = ('created_at', 'updated_at', 'last_login')
-        # dump_only = ('created_at', 'updated_at', 'last_login')
+        additional = ('created_at',
+                      'updated_at',
+                      'last_login',
+                      )
+        dump_only = ('created_at',
+                     'updated_at',
+                     'last_login',
+                     'favorite_exercises',
+                     'authored_exercises',
+                     'href',
+                     )
 
 
 class ActionSchema(Schema):
-    APPEND = 'favorite'
-    REMOVE = 'unfavorite'
+    UNFAVORITE = 'unfavorite'
+    FAVORITE = 'favorite'
 
     id = HashIDField(required=True)
     action = fields.Str(
         required=True,
-        validate=validate.OneOf([APPEND, REMOVE],
+        validate=validate.OneOf([FAVORITE, UNFAVORITE],
                                 error='Must be one of {choices}'))
