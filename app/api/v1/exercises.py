@@ -64,7 +64,7 @@ def get_exercises(favorited_by=None, author_id=None):
     order_by = request.args.get('order_by', 'added')
 
     query = Exercise.query
-    query = Exercise.with_rating(query, order_by == 'rating')
+    query = Exercise.with_avg_rating(query, order_by == 'rating')
     query = Exercise.search(search_params, query, order_by == 'search')
     query = query.order_by(Exercise.created_at.desc())
 

@@ -13,7 +13,6 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
-    Table,
     Text,
     UniqueConstraint,
 )
@@ -342,13 +341,6 @@ where(Choice.response_id == QuestionnaireResponse.id).as_scalar(), Integer)))
                 ))
 
 
-exercise_category = Table(
-    'exercise_category', Base.metadata,
-    Column('exercise_id', Integer, ForeignKey('exercise.id')),
-    Column('category.id', Integer, ForeignKey('category.id'))
-)
-
-
 class Category(Base):
     id = IDColumn()
     name = Column(String, nullable=False)
@@ -368,32 +360,55 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     tsv = Column(TSVECTOR)
     author_id = Column(ID_TYPE, ForeignKey('user.id'))
 
+    category_id = Column(ID_TYPE, ForeignKey('category.id'))
     category = relationship(
         'Category',
-        secondary=exercise_category,
         backref='exercises',
+        lazy='subquery',
     )
+
+    @property
+    def category_(self):
+        return self.category.name
 
     __table_args__ = Index('ix_exercise_tsv', 'tsv', postgresql_using='gin'),
 
     @classmethod
-    def with_rating(cls, query, order_by=False):
+    def with_rating(cls, query, user_id):
+        '''Returns the query with the average rating as an additional column.
+        It's important to not that the SQLAlchemy results will be an iterable
+        of tuples, instead of an iterable of Exercises.
+        '''
+
+        rating = query.session.\
+            query(Rating.exercise_id, Rating.rating).\
+            filter(Rating.user_id == user_id).\
+            subquery()
+
+        query = query.add_columns(rating.c.rating).\
+            outerjoin(rating, rating.c.exercise_id == cls.id).\
+            group_by(rating.c.rating)
+
+        return query
+
+    @classmethod
+    def with_avg_rating(cls, query, order_by=False):
         '''Returns the query with the average rating as an additional column.
         It's important to not that the SQLAlchemy results will be an iterable
         of tuples, instead of an iterable of Exercises.
         '''
 
         avg_rating = query.session.\
-            query(Rating.exercise_id, func.avg(Rating.rating).label('rating')).\
+            query(Rating.exercise_id, func.avg(Rating.rating).label('avg_rating')).\
             group_by(Rating.exercise_id).\
             subquery()
 
-        query = query.add_columns(avg_rating.c.rating).\
+        query = query.add_columns(avg_rating.c.avg_rating).\
             outerjoin(avg_rating, avg_rating.c.exercise_id == cls.id).\
-            group_by(cls, avg_rating.c.rating)
+            group_by(cls, avg_rating.c.avg_rating)
 
         if order_by:
-            query = query.order_by(nullslast(avg_rating.c.rating.desc()))
+            query = query.order_by(nullslast(avg_rating.c.avg_rating.desc()))
 
         return query
 
@@ -485,6 +500,7 @@ event.listen(Exercise.__table__, 'before_drop', DDL(drop_ts_vector_ddl))
 __all__ = [
     'Base',
     'Choice',
+    'Category',
     'db',
     'Exercise',
     'MaxEditTimeExpiredError',

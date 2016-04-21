@@ -54,13 +54,14 @@ class ExerciseSchema(Schema):
     title = fields.Str(required=True)
     description = fields.Str(required=True)
     data = fields.Dict()
+    category_ = fields.Str(dump_only=True)
     href = FlaskUrlField(route='v1.get_exercise',
                          route_args={'id': 'id'},
                          dump_only=True)
     author = ExpandableNested('UserSchema', only=('username', 'href'))
 
     favorited = fields.Bool(dump_only=True)
-    rating = fields.Float()
+    avg_rating = fields.Float()
     allow_edit = fields.Bool()
 
     # class Meta:

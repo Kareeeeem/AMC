@@ -27,9 +27,11 @@ def generate_users():
 
 def generate_exercises(users):
     db, models = get_db_and_models()
+    categories = [models.Category(name='geluid'), models.Category(name='beweging')]
     exercises = [models.Exercise(title='title%s' % i,
                                  description='desc%s' % i,
                                  author=random.choice(users),
+                                 category=random.choice(categories),
                                  ) for i in xrange(1000)]
     db.session.add_all(exercises)
     return exercises

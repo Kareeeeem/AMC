@@ -12,7 +12,7 @@ class Config(object):
     CSRF_ENABLED = True
     DEBUG = False
     TESTING = False
-    LOGGING_LEVEL = 'DEBUG'
+    LOGGING_LEVEL = 'INFO'
     BASEDIR = basedir
     BCRYPT_ROUNDS = 12
     # one month
