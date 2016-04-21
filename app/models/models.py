@@ -21,6 +21,7 @@ from sqlalchemy.dialects.postgresql import INT4RANGE, JSONB, TSVECTOR
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import relationship, backref
+from sqlalchemy.sql.expression import nullslast
 
 from meta.orm import db
 from meta.mixins import TokenMixin, CreatedUpdatedMixin, CRUDMixin
@@ -376,12 +377,13 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     __table_args__ = Index('ix_exercise_tsv', 'tsv', postgresql_using='gin'),
 
     @classmethod
-    def with_rating(cls, session, query, order_by=False):
+    def with_rating(cls, query, order_by=False):
         '''Returns the query with the average rating as an additional column.
         It's important to not that the SQLAlchemy results will be an iterable
         of tuples, instead of an iterable of Exercises.
         '''
-        avg_rating = session.\
+
+        avg_rating = query.session.\
             query(Rating.exercise_id, func.avg(Rating.rating).label('rating')).\
             group_by(Rating.exercise_id).\
             subquery()
@@ -391,29 +393,27 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
             group_by(cls, avg_rating.c.rating)
 
         if order_by:
-            query = query.order_by(avg_rating.c.rating.desc())
+            query = query.order_by(nullslast(avg_rating.c.rating.desc()))
 
         return query
 
     @classmethod
-    def with_favorited_by(cls, session, query, favorited_by_user_id):
+    def with_favorited(cls, query, user_id, ownfavorites=False):
         '''Returns the query with the favorited additional column, which will
         be 1 or 0.  It's important to not that the SQLAlchemy results will be
         an iterable of tuples, instead of an iterable of Exercises.
         '''
 
-        # subquery for favorited exercises
-        favorited = session.\
+        isouter = False if ownfavorites else True
+
+        favorited = query.session.\
             query(UserFavoriteExercise.exercise_id).\
-            filter_by(user_id=favorited_by_user_id).\
+            filter_by(user_id=user_id).\
             subquery()
 
-        # query the exercises and additional info
-        query = query.\
+        return query.\
             add_columns(func.count(favorited.c.exercise_id).label('favorited')).\
-            outerjoin(favorited, favorited.c.exercise_id == cls.id)
-
-        return query
+            join(favorited, favorited.c.exercise_id == cls.id, isouter=isouter)
 
     @classmethod
     def search(cls, search_terms, query, order_by=False):
@@ -432,12 +432,12 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
         return query
 
     @property
-    def allow_edit(self):
+    def edit_allowed(self):
         '''Only allow edits if exercise is no older than MAX_EDIT_TIME.'''
         return (datetime.utcnow() - self.created_at) < self.MAX_EDIT_TIME
 
     def update(self, session, data, commit=True):
-        if not self.allow_edit:
+        if not self.edit_allowed:
             raise MaxEditTimeExpiredError
 
         return super(Exercise, self).update(session, data, commit=commit)

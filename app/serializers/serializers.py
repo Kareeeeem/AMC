@@ -79,8 +79,8 @@ class UserSchema(Schema):
 
     authored_exercises = ExpandableNested(
         'ExerciseSchema',
-        collection_route='v1.get_user_exercises',
-        route_arg_keys={'id': 'id'},
+        collection_route='v1.get_exercises',
+        route_arg_keys={'author_id': 'id'},
         exclude=('author',),
         dump_only=True,
         many=True,
@@ -92,8 +92,8 @@ class ProfileSchema(UserSchema):
     password = fields.Str(required=True, validate=validate.Length(min=8))
     favorite_exercises = ExpandableNested(
         'ExerciseSchema',
-        collection_route='v1.get_user_favorites',
-        route_arg_keys={'id': 'id'},
+        collection_route='v1.get_exercises',
+        route_arg_keys={'favorited_by': 'id'},
         dump_only=True,
         many=True,
     )

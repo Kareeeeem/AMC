@@ -11,7 +11,7 @@ def test_url_field(user, session):
 def test_nested_field_collapsed(user, exercise, session):
     s = UserSchema()
     rv = s.dump(user).data
-    assert rv['authored_exercises'] == url_for('v1.get_user_exercises', id=user.id)
+    assert rv['authored_exercises'] == url_for('v1.get_exercises', author_id=user.id)
 
 
 def test_nested_field_expanded(user, exercise, session):

@@ -1,8 +1,9 @@
 from flask import request
+from sqlalchemy.orm import contains_eager
 
 from app import auth, db
 from app.models import Exercise, User
-from app.serializers import ExerciseSchema, Serializer
+from app.serializers import ExerciseSchema, Serializer, ActionSchema
 from app.lib import (
     parse_query_params,
     AuthorizationError,
@@ -10,8 +11,6 @@ from app.lib import (
     get_location_header,
     get_or_404,
 )
-
-from sqlalchemy.orm import aliased, contains_eager
 
 from . import v1
 
@@ -42,34 +41,64 @@ def post_exercises():
 
 
 @v1.route('/exercises', methods=['GET'])
+@v1.route('/users/<hashid:favorited_by>/favorites', methods=['GET'])
+@v1.route('/users/<hashid:author_id>/exercises', methods=['GET'])
 @auth.token_optional
-def get_exercises():
-    '''Get exercise collection.'''
+def get_exercises(favorited_by=None, author_id=None):
+    '''Get exercise collection, if favorited_by is set then get the
+    collection of favorites of the user.'''
 
-    # possible order_by's: rating, relevance, added (default)
-    order_by = request.args.get('order_by', 'added')
+    user_id = auth.current_user.id if auth.current_user else None
 
-    # Initial query with the default ordering
-    query = Exercise.query.order_by(Exercise.created_at.desc())
-    query = Exercise.with_rating(db.session, query, order_by=order_by == 'rating')
+    # client requests favorites that are not his
+    if favorited_by and favorited_by != user_id:
+        raise AuthorizationError
+    # client request own favorites
+    elif favorited_by and favorited_by == user_id:
+        ownfavorites = True
+    # client requests the general exercise collection
+    else:
+        ownfavorites = False
 
     search_params = request.args.get('search')
-    query = Exercise.search(search_params, query, order_by == 'search')
+    order_by = request.args.get('order_by', 'added')
 
-    if auth.current_user:
-        query = Exercise.with_favorited_by(db.session, query, auth.current_user.id)
+    query = Exercise.query
+    query = Exercise.with_rating(query, order_by == 'rating')
+    query = Exercise.search(search_params, query, order_by == 'search')
+    query = query.order_by(Exercise.created_at.desc())
+
+    if user_id:
+        query = Exercise.with_favorited(query, user_id, ownfavorites=ownfavorites)
+
+    if author_id:
+        query = query.filter(Exercise.author_id == author_id)
 
     if 'author' in parse_query_params(request.args, 'extend'):
-        author_alias = aliased(User)
         query = query.\
-            outerjoin(author_alias, Exercise.author).\
-            options(contains_eager(Exercise.author, alias=author_alias)).\
-            group_by(author_alias)
+            outerjoin(User, Exercise.author).\
+            options(contains_eager(Exercise.author))
 
     page = Pagination(request, query=query)
+    return Serializer(ExerciseSchema, request.args).dump_page(page)
 
-    serializer = Serializer(ExerciseSchema, request.args)
-    return serializer.dump_page(page)
+
+@v1.route('/users/<hashid:id>/favorites', methods=['POST'])
+@auth.token_required
+def add_to_favorites(id):
+    '''Add or remove an exercise to favorites.'''
+    if auth.current_user.id != id:
+        raise AuthorizationError
+
+    data = ActionSchema().load(request.get_json()).data
+    exercise = get_or_404(Exercise, data['id'])
+    if data['action'] == ActionSchema.APPEND:
+        auth.current_user.favorite_exercises.append(exercise)
+    else:
+        auth.current_user.favorite_exercises = [ex for ex in auth.current_user.favorite_exercises
+                                                if ex.id != data['id']]
+    db.session.commit()
+    return {}, 204
 
 
 @v1.route('/exercises/<hashid:id>', methods=['GET'])

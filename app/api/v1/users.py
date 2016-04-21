@@ -1,10 +1,8 @@
 from flask import request
 
 from app import auth, db
-from app.models import User, Exercise, UserFavoriteExercise
+from app.models import User
 from app.serializers import (
-    ActionSchema,
-    ExerciseSchema,
     ProfileSchema,
     Serializer,
     UserSchema,
@@ -95,46 +93,4 @@ def delete_user(id):
         raise AuthorizationError
 
     auth.current_user.delete(db.session)
-    return {}, 204
-
-
-@v1.route('/users/<hashid:id>/exercises', methods=['GET'])
-def get_user_exercises(id):
-    '''Get collection of exercises authored by user.'''
-    query = Exercise.query.filter_by(author_id=id)
-    page = Pagination(request, query=query)
-    return Serializer(ExerciseSchema, request.args).dump_page(page)
-
-
-@v1.route('/users/<hashid:id>/favorites', methods=['GET'])
-@auth.token_required
-def get_user_favorites(id):
-    '''Get collection of exercises authored by user.'''
-    if auth.current_user.id != id:
-        raise AuthorizationError
-
-    query = Exercise.query.\
-        join(UserFavoriteExercise).\
-        filter_by(user_id=auth.current_user.id).\
-        order_by(UserFavoriteExercise.added.desc())
-
-    page = Pagination(request, query=query)
-    return Serializer(ExerciseSchema, request.args).dump_page(page)
-
-
-@v1.route('/users/<hashid:id>/favorites', methods=['POST'])
-@auth.token_required
-def add_to_favorites(id):
-    '''Add or remove an exercise to favorites.'''
-    if auth.current_user.id != id:
-        raise AuthorizationError
-
-    data = ActionSchema().load(request.get_json()).data
-    exercise = get_or_404(Exercise, data['id'])
-    if data['action'] == ActionSchema.APPEND:
-        auth.current_user.favorite_exercises.append(exercise)
-    else:
-        auth.current_user.favorite_exercises = [ex for ex in auth.current_user.favorite_exercises
-                                                if ex.id != data['id']]
-    db.session.commit()
     return {}, 204
