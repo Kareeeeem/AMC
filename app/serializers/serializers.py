@@ -1,12 +1,17 @@
 from flask import url_for
-from marshmallow import fields, validate, validates_schema
-
-from meta import Schema
-from fields import HashIDField
-from validators import validate_unique
+from marshmallow import (
+    fields,
+    validate,
+    validates_schema,
+    validates,
+    ValidationError,
+)
 
 from app import models
 from app.lib import parse_query_params
+from fields import HashIDField
+from meta import Schema
+from validators import validate_unique
 
 
 def generate_url(route, **kwargs):
@@ -54,7 +59,7 @@ class ExerciseSchema(Schema):
     title = fields.Str(required=True)
     description = fields.Str(required=True)
     data = fields.Dict()
-    category_ = fields.Str(dump_only=True)
+    category = fields.Str(dump_only=True, attribute='category_')
     favorited = fields.Bool(dump_only=True)
     avg_rating = fields.Float()
     my_rating = fields.Float(attribute='rating')
@@ -139,3 +144,12 @@ class ActionSchema(Schema):
         required=True,
         validate=validate.OneOf([FAVORITE, UNFAVORITE],
                                 error='Must be one of {choices}'))
+
+
+class RatingSchema(Schema):
+    rating = fields.Integer(required=True)
+
+    @validates('rating')
+    def validate_rating(self, value):
+        if value < 1 or value > 5:
+            raise ValidationError('Rating must be larger than zero and lower than 5')

@@ -2,8 +2,13 @@ from flask import request
 from sqlalchemy.orm import subqueryload
 
 from app import auth, db
-from app.models import Exercise
-from app.serializers import ExerciseSchema, Serializer, ActionSchema
+from app.models import Exercise, Category, Rating
+from app.serializers import (
+    ExerciseSchema,
+    Serializer,
+    ActionSchema,
+    RatingSchema,
+)
 from app.lib import (
     parse_query_params,
     AuthorizationError,
@@ -55,6 +60,7 @@ def get_exercises(favorited_by=None, author_id=None):
         raise AuthorizationError
 
     search_params = request.args.get('search')
+    category = request.args.get('category')
     order_by = request.args.get('order_by', 'added')
 
     query = Exercise.query
@@ -70,6 +76,10 @@ def get_exercises(favorited_by=None, author_id=None):
 
     if author_id:
         query = query.filter(Exercise.author_id == author_id)
+
+    if category:
+        query = query.join(Category).\
+            filter(Category.name == category)
 
     if 'author' in parse_query_params(request.args, key='expand'):
         query = query.options(subqueryload(Exercise.author))
@@ -127,4 +137,28 @@ def delete_exercise(id):
         raise AuthorizationError
 
     exercise.delete(db.session)
+    return {}, 204
+
+
+@v1.route('/exercises/<hashid:id>/ratings', methods=['POST'])
+@auth.token_required
+def rate_exercise(id):
+    '''Rate an exercise, or update previous rating.'''
+    exercise = get_or_404(Exercise, id)
+    serializer = Serializer(RatingSchema, request.args)
+    data = serializer.load(request.get_json())
+
+    rating = Rating.query.filter(
+        Rating.exercise_id == exercise.id,
+        Rating.user_id == auth.current_user.id).\
+        first()
+
+    if not rating:
+        # POST is basically a "do what you want" method. So strictly speaking
+        # updating a previous score doesn't violate any rules.
+        rating = Rating(exercise_id=exercise.id, user_id=auth.current_user.id)
+        db.session.add(rating)
+
+    rating.rating = data['rating']
+    db.session.commit()
     return {}, 204
