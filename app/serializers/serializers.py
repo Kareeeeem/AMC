@@ -7,7 +7,7 @@ from marshmallow import (
     ValidationError,
 )
 
-from app import models
+from app import models, db
 from app.lib import parse_query_params
 from fields import HashIDField
 from meta import Schema
@@ -55,17 +55,28 @@ class Serializer(object):
 
 
 class ExerciseSchema(Schema):
-    id = HashIDField(dump_only=True)
     title = fields.Str(required=True)
     description = fields.Str(required=True)
     data = fields.Dict()
-    category = fields.Str(dump_only=True, attribute='category_')
+    category = fields.Str(required=True, attribute='category_name')
+
+    @validates('category')
+    def validate_category(self, value):
+        print value
+        categories = [c.name for c in
+                      db.session.query(models.Category.name).all()]
+        if value not in categories:
+            msg = 'category must be one of: {}.'.format(', '.join(categories))
+            raise ValidationError(msg)
+
+    id = HashIDField(dump_only=True)
     favorited = fields.Bool(dump_only=True)
-    avg_rating = fields.Float()
-    my_rating = fields.Float(attribute='rating')
-    allow_edit = fields.Bool()
-    href = fields.Function(lambda o: generate_url('v1.get_exercise', id=o.id))
-    author = fields.Method('get_author')
+    avg_rating = fields.Decimal(places=2, dump_only=True)
+    my_rating = fields.Integer(attribute='rating', dump_only=True)
+    allow_edit = fields.Bool(dump_only=True)
+    author = fields.Method('get_author', dump_only=True)
+    href = fields.Function(lambda o: generate_url('v1.get_exercise', id=o.id),
+                           dump_only=True)
 
     def get_author(self, obj):
         if 'author' not in self.expand:
@@ -74,14 +85,8 @@ class ExerciseSchema(Schema):
             return fields.Nested(UserSchema).serialize('author', obj)
 
     class Meta:
-        additional = ('created_at',
-                      'updated_at',
-                      )
-        dump_only = ('created_at',
-                     'updated_at',
-                     'author',
-                     'href',
-                     )
+        additional = ('created_at', 'updated_at')
+        dump_only = ('created_at', 'updated_at')
 
 
 class UserSchema(Schema):

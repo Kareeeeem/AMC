@@ -6,7 +6,6 @@ from sqlalchemy import (
     DateTime,
     DDL,
     event,
-    Float,
     ForeignKey,
     ForeignKeyConstraint,
     func,
@@ -122,7 +121,7 @@ class UserFavoriteExercise(Base):
 
 
 class Rating(Base):
-    rating = Column(Float, nullable=False)
+    rating = Column(Integer, nullable=False)
     user_id = Column(
         ID_TYPE,
         ForeignKey('user.id', ondelete='CASCADE'),
@@ -143,7 +142,7 @@ class Rating(Base):
 
 class Category(Base):
     id = IDColumn()
-    name = Column(String, nullable=False)
+    name = Column(String, unique=True, nullable=False)
 
 
 class MaxEditTimeExpiredError(Exception):
@@ -170,10 +169,35 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     )
 
     @property
-    def category_(self):
+    def category_name(self):
         return self.category.name
 
     __table_args__ = Index('ix_exercise_tsv', 'tsv', postgresql_using='gin'),
+
+    @classmethod
+    def create(cls, session, data, commit=True):
+        '''Create an instance from a dictionary
+        :param bool commit: a boolean stating wether to commit at the end.
+        '''
+        category = session.query(Category).\
+            filter(Category.name == data.pop('category_name')).first()
+
+        data['category'] = category
+
+        return super(Exercise, cls).create(session, data, commit=commit)
+
+    def update(self, session, data, commit=True):
+        '''Update an instance from a dictionary
+        :param bool commit: a boolean stating wether to commit at the end
+        '''
+        if not self.edit_allowed:
+            raise MaxEditTimeExpiredError
+
+        category = session.query(Category).\
+            filter(Category.name == data.pop('category_name')).first()
+
+        data['category'] = category
+        return super(Exercise, self).update(session, data, commit=commit)
 
     @classmethod
     def with_rating(cls, query, user_id):
@@ -252,12 +276,6 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     def edit_allowed(self):
         '''Only allow edits if exercise is no older than MAX_EDIT_TIME.'''
         return (datetime.utcnow() - self.created_at) < self.MAX_EDIT_TIME
-
-    def update(self, session, data, commit=True):
-        if not self.edit_allowed:
-            raise MaxEditTimeExpiredError
-
-        return super(Exercise, self).update(session, data, commit=commit)
 
     def __repr__(self):
         return ('Exercise(id=%r, title=%r, description=%r, data=%r, '
