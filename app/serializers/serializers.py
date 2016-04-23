@@ -62,7 +62,6 @@ class ExerciseSchema(Schema):
 
     @validates('category')
     def validate_category(self, value):
-        print value
         categories = [c.name for c in
                       db.session.query(models.Category.name).all()]
         if value not in categories:

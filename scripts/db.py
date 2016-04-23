@@ -7,33 +7,33 @@ import click
 from flask.cli import pass_script_info
 from pgcli.main import PGCli
 
+from app import db as db_, models
 from scripts.cli import cli
 
 
-def get_db_and_models():
-    from app import db, models
-    return db, models
-
-
 def generate_users():
-    db, models = get_db_and_models()
     users = [models.User(username='user%s' % i,
                          email='email%s@gmail.com' % i,
                          password='00000000'
                          ) for i in xrange(100)]
-    db.session.add_all(users)
+    db_.session.add_all(users)
     return users
 
 
 def generate_exercises(users):
-    db, models = get_db_and_models()
-    categories = [models.Category(name='geluid'), models.Category(name='beweging')]
-    exercises = [models.Exercise(title='title%s' % i,
-                                 description='desc%s' % i,
-                                 author=random.choice(users),
-                                 category=random.choice(categories),
-                                 ) for i in xrange(1000)]
-    db.session.add_all(exercises)
+    categories = [
+        models.Category(name=name) for name in
+        'relaxatie concentratie associatie confrontatie anders'.split()
+    ]
+
+    exercises = [
+        models.Exercise(title='title%s' % i,
+                        description='desc%s' % i,
+                        author=random.choice(users),
+                        category=random.choice(categories),
+                        ) for i in xrange(1000)]
+
+    db_.session.add_all(exercises)
     return exercises
 
 
@@ -46,8 +46,7 @@ def db():
 @click.pass_context
 def drop(ctx):
     '''Drop all database tables.'''
-    db, models = get_db_and_models()
-    models.Base.metadata.drop_all(db.engine)
+    models.Base.metadata.drop_all(db_.engine)
     click.echo('Dropped all tables')
 
 
@@ -56,17 +55,15 @@ def drop(ctx):
 @click.pass_context
 def create(ctx, d):
     '''Optionally drop and create all database tables.'''
-    db, models = get_db_and_models()
     if d:
         ctx.invoke(drop)
-    models.Base.metadata.create_all(db.engine)
+    models.Base.metadata.create_all(db_.engine)
     click.echo('Created all tables')
 
 
 @db.command()
 @click.pass_obj
 def fill(obj):
-    db, models = get_db_and_models()
     users = generate_users()
     exercises = generate_exercises(users)
     users[0].favorite_exercises = exercises[:10]
@@ -75,9 +72,9 @@ def fill(obj):
     with open(os.path.join(basedir, 'amisos.json')) as amisos_json:
         data = json.load(amisos_json)
         amisos = models.Questionnaire(**data)
-        db.session.add(amisos)
+        db_.session.add(amisos)
 
-    db.session.commit()
+    db_.session.commit()
 
 
 @db.command()
