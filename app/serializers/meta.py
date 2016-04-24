@@ -1,29 +1,12 @@
-from marshmallow import (
-    Schema as _Schema,
-    SchemaOpts as _SchemaOpts,
-    fields,
-    post_dump,
-)
+from marshmallow import Schema as _Schema, SchemaOpts as _SchemaOpts, post_dump
 
 
 class SchemaOpts(_SchemaOpts):
     def __init__(self, meta):
         _SchemaOpts.__init__(self, meta)
         self.strict = True
-
-
-class PaginationSchema(_Schema):
-    page = fields.Integer()
-    pages = fields.Integer()
-    per_page = fields.Integer()
-    order_by = fields.String()
-
-    total = fields.Integer(attribute='total_count')
-    next = fields.Url(attribute='next_page_url')
-    prev = fields.Url(attribute='prev_page_url')
-    first = fields.Url(attribute='first_page_url')
-    last = fields.Url(attribute='last_page_url')
-    current = fields.Url(attribute='current_page_url')
+        self.related = getattr(meta, 'related', None)
+        self.meta = getattr(meta, 'meta', None)
 
 
 class Schema(_Schema):
@@ -34,9 +17,26 @@ class Schema(_Schema):
         self.expand = expand or []
         self.page = page
 
-    @post_dump(pass_many=True)
-    def wrap_in_pagination(self, data, many):
-        if many and self.page:
-            page = PaginationSchema().dump(self.page).data
-            page.update(items=data)
-            return page
+    @post_dump
+    def format(self, data):
+        rv = dict(data=data)
+
+        if self.opts.meta:
+            meta_dict = {}
+            for key in self.opts.meta:
+                try:
+                    meta_dict[key] = data.pop(key)
+                except KeyError:
+                    pass
+            rv.update(meta=meta_dict)
+
+        if self.opts.related:
+            related_dict = {}
+            for key in self.opts.related:
+                try:
+                    related_dict[key] = data.pop(key)
+                except KeyError:
+                    pass
+            rv.update(related=related_dict)
+
+        return rv

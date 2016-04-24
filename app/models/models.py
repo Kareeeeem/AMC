@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 from psycopg2.extras import NumericRange
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     DDL,
@@ -16,14 +17,14 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import INT4RANGE, JSONB, TSVECTOR
-from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql.expression import nullslast
 
-from meta.orm import db
-from meta.mixins import TokenMixin, CreatedUpdatedMixin, CRUDMixin
 from meta.columns import IDColumn, PasswordColumn
+from meta.mixins import TokenMixin, CreatedUpdatedMixin, CRUDMixin
+from meta.orm import db
 
 ID_TYPE = Integer
 Base = db.Base
@@ -156,9 +157,13 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     data = Column(JSONB)
+    difficulty = Column(Integer, default=0)
+    group_exercise = Column(Boolean, default=False)
+    private_exercise = Column(Boolean, default=False)
+    duration = Column(INT4RANGE)
     tsv = Column(TSVECTOR)
-    author_id = Column(ID_TYPE, ForeignKey('user.id'))
 
+    author_id = Column(ID_TYPE, ForeignKey('user.id'))
     category_id = Column(ID_TYPE, ForeignKey('category.id'))
     category = relationship(
         'Category',
@@ -175,52 +180,25 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     __table_args__ = Index('ix_exercise_tsv', 'tsv', postgresql_using='gin'),
 
     @classmethod
-    def create(cls, session, data, commit=True):
-        '''Create an instance from a dictionary
-        :param bool commit: a boolean stating wether to commit at the end.
-        '''
-        category = session.query(Category).\
-            filter(Category.name == data.pop('category_name')).first()
-
-        data['category'] = category
-
-        return super(Exercise, cls).create(session, data, commit=commit)
-
-    def update(self, session, data, commit=True):
-        '''Update an instance from a dictionary
-        :param bool commit: a boolean stating wether to commit at the end
-        '''
-        if not self.edit_allowed:
-            raise MaxEditTimeExpiredError
-
-        category = session.query(Category).\
-            filter(Category.name == data.pop('category_name')).first()
-
-        data['category'] = category
-        return super(Exercise, self).update(session, data, commit=commit)
-
-    @classmethod
     def with_rating(cls, query, user_id):
-        '''Returns the query with the average rating as an additional column.
-        It's important to not that the SQLAlchemy results will be an iterable
-        of tuples, instead of an iterable of Exercises.
-        '''
+        '''Returns the query with the rating the user gave as an
+        additional column. It's important to note that the SQLAlchemy
+        results will be an iterable of tuples, instead of an iterable of
+        Exercises. '''
 
         rating = query.session.\
             query(Rating.exercise_id, Rating.rating).\
             filter(Rating.user_id == user_id).\
             subquery()
 
-        query = query.add_columns(rating.c.rating).\
+        return query.add_columns(rating.c.rating).\
             outerjoin(rating, rating.c.exercise_id == cls.id).\
             group_by(rating.c.rating)
-
-        return query
 
     @classmethod
     def with_avg_rating(cls, query, order_by=False):
         '''Returns the query with the average rating as an additional column.
-        It's important to not that the SQLAlchemy results will be an iterable
+        It's important to note that the SQLAlchemy results will be an iterable
         of tuples, instead of an iterable of Exercises.
         '''
 
@@ -245,7 +223,9 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
         an iterable of tuples, instead of an iterable of Exercises.
         '''
 
-        isouter = False if ownfavorites else True
+        # if we don't only want the users own favorites we want to do an outer
+        # join.
+        isouter = not bool(ownfavorites)
 
         favorited = query.session.\
             query(UserFavoriteExercise.exercise_id).\

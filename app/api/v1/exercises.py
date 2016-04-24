@@ -26,11 +26,10 @@ from . import v1
 # /exercises/<id>                         GET     retrieve a single exercise
 # /exercises/<id>                         PUT     edit exercise
 # /exercises/<id>                         DELETE  delete exercise
-# TODO /exercises/<id>/ratings            GET     all ratings for exercise
-# TODO /exercises/<id>/ratings            POST    new rating
-# TODO /exercises/<id>/ratings/<user_id>  GET     retrieve rating
-# TODO /exercises/<id>/ratings/<user_id>  PUT     edit rating
-# TODO /exercises/<id>/ratings/<user_id>  DELETE  delete rating
+# /users/<id>/exercises                   GET     retreive all exercises authored by user
+# /users/<id>/favorites                   GET     retreive all exercises favorited by user
+# /users/<id>/favorites                   POST    favorite or unfavorite exercise
+# /exercises/<id>/ratings                 POST    new or update rating
 
 
 @v1.route('/exercises', methods=['POST'])
@@ -145,8 +144,7 @@ def delete_exercise(id):
 def rate_exercise(id):
     '''Rate an exercise, or update previous rating.'''
     exercise = get_or_404(Exercise, id)
-    serializer = Serializer(RatingSchema, request.args)
-    data = serializer.load(request.get_json())
+    data = Serializer(RatingSchema).load(request.get_json())
 
     rating = Rating.query.filter(
         Rating.exercise_id == exercise.id,
@@ -162,3 +160,10 @@ def rate_exercise(id):
     rating.rating = data['rating']
     db.session.commit()
     return {}, 204
+
+
+@v1.route('/exercises/categories', methods=['GET'])
+def get_categories():
+    '''Get a list of available categories.'''
+    categories = Category.query.all()
+    return dict(categories=[c.name for c in categories])

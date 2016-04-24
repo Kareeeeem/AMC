@@ -21,9 +21,6 @@ from . import v1
 # /users/<id>                 GET     retrieve a single user
 # /users/<id>                 PUT     edit user
 # /users/<id>                 DELETE  edit user
-# /users/<id>/exercises       GET     retreive all exercises authored by user
-# /users/<id>/favorites       GET     retreive all exercises favorited by user
-# TODO /users/<id>/ratings    GET     retreive all ratings authored by user
 # TODO /users/<id>/responses  GET     retreive all responses authored by user
 
 
@@ -59,11 +56,11 @@ def get_user(id):
     return serializer.dump(user)
 
 
-# @v1.route('/users/profile', methods=['GET'])
-# @auth.token_required
-# def get_profile():
-#     '''Get a single user. '''
-#     return Serializer(ProfileSchema, request.args).dump(auth.current_user)
+@v1.route('/users/profile', methods=['GET'])
+@auth.token_required
+def get_profile():
+    '''Get a single user. '''
+    return Serializer(ProfileSchema, request.args).dump(auth.current_user)
 
 
 @v1.route('/users/<hashid:id>', methods=['PUT'])

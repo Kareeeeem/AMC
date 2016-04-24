@@ -6,6 +6,11 @@ import inspect
 from flask import url_for, current_app, Response, jsonify, abort
 
 
+def make_url(route, **kwargs):
+    '''Generate an external url.'''
+    return url_for(route, _external=True, **kwargs)
+
+
 class Enum(frozenset):
     '''A ghetto Enum implementation. A set that allows attribute access.
     '''

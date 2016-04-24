@@ -4,6 +4,7 @@ import os
 import json
 
 import click
+from psycopg2.extras import NumericRange
 from flask.cli import pass_script_info
 from pgcli.main import PGCli
 
@@ -23,15 +24,18 @@ def generate_users():
 def generate_exercises(users):
     categories = [
         models.Category(name=name) for name in
-        'relaxatie concentratie associatie confrontatie anders'.split()
+        'relaxatie concentratie associatie confrontatie'.split()
     ]
+    categories.append(None)
 
-    exercises = [
-        models.Exercise(title='title%s' % i,
-                        description='desc%s' % i,
-                        author=random.choice(users),
-                        category=random.choice(categories),
-                        ) for i in xrange(1000)]
+    ranges = [NumericRange(0, 5), NumericRange(5, 15), NumericRange(15, None)]
+
+    exercises = [models.Exercise(title='title%s' % i,
+                                 description='desc%s' % i,
+                                 author=random.choice(users),
+                                 category=random.choice(categories),
+                                 duration=random.choice(ranges),
+                                 ) for i in xrange(1000)]
 
     db_.session.add_all(exercises)
     return exercises
