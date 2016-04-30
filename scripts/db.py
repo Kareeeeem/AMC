@@ -12,16 +12,16 @@ from app import db as db_, models
 from scripts.cli import cli
 
 
-def generate_users():
+def generate_users(amount=100):
     users = [models.User(username='user%s' % i,
                          email='email%s@gmail.com' % i,
                          password='00000000'
-                         ) for i in xrange(100)]
+                         ) for i in xrange(amount)]
     db_.session.add_all(users)
     return users
 
 
-def generate_exercises(users):
+def generate_exercises(users, amount=1000):
     categories = [
         models.Category(name=name) for name in
         'relaxatie concentratie associatie confrontatie'.split()
@@ -35,10 +35,21 @@ def generate_exercises(users):
                                  author=random.choice(users),
                                  category=random.choice(categories),
                                  duration=random.choice(ranges),
-                                 ) for i in xrange(1000)]
+                                 ) for i in xrange(amount)]
 
     db_.session.add_all(exercises)
     return exercises
+
+
+def generate_ratings(users, exercises):
+    db_.session.add_all(
+        models.Rating(user=user, exercise=exercise, rating=random.choice((1, 2, 3, 4, 5)))
+        for exercise in exercises
+        for user in users
+        # randomize the mount of ratings a bit. Every user should rate about
+        # onr third of exercises.
+        if random.choice([False, False, True])
+    )
 
 
 @cli.group(chain=True)
@@ -68,8 +79,11 @@ def create(ctx, d):
 @db.command()
 @click.pass_obj
 def fill(obj):
-    users = generate_users()
-    exercises = generate_exercises(users)
+    useramount = 10
+    exerciseamount = 100
+    users = generate_users(amount=useramount)
+    exercises = generate_exercises(users, amount=exerciseamount)
+    generate_ratings(users, exercises[:exerciseamount / 2])
     users[0].favorite_exercises = exercises[:10]
 
     basedir = os.path.abspath(os.path.dirname(__file__))

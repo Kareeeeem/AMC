@@ -21,7 +21,7 @@ def create_app(config_name='default'):
 
     hashid.init_app(app)
     db.init_app(app)
-    CORS(app, origins="http://localhost:3000")
+    CORS(app, origins="http://localhost:*")
 
     # API v1
     from app.api import v1

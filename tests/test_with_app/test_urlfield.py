@@ -11,16 +11,16 @@ from app.serializers import UserSchema, ExerciseSchema
 def test_nested_field_collapsed(user, exercise, session):
     s = UserSchema()
     rv = s.dump(user).data
-    assert rv['authored_exercises'] == url_for('v1.get_exercises', author_id=user.id)
+    assert rv['related']['authored_exercises'] == url_for('v1.get_exercises', author_id=user.id)
 
 
 def test_nested_field_expanded(user, exercise, session):
     s = UserSchema(expand=['authored_exercises'])
     rv = s.dump(user).data
-    assert isinstance(rv['authored_exercises'][0], dict)
+    assert isinstance(rv['related']['authored_exercises'][0], dict)
 
 
 def test_nested_field_recursive(user, exercise, session):
     s = ExerciseSchema(expand=['author'])
     rv = s.dump(exercise).data
-    assert rv['author'].get('exercises', 'not there') == 'not there'
+    assert rv['related']['author'].get('exercises', 'not there') == 'not there'

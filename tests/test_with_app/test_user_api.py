@@ -83,7 +83,7 @@ def test_put_user(app, session):
                         data=json.dumps(user),
                         content_type='application/json',
                         headers=dict(Authorization='Bearer {}'.format(jwt)))
-    assert rv.status_code == 200 and json.loads(rv.data)['username'] == 'hajar'
+    assert rv.status_code == 200 and json.loads(rv.data)['data']['username'] == 'hajar'
 
 
 def test_delete_user(app, session):

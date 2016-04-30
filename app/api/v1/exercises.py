@@ -1,8 +1,10 @@
 from flask import request
-from sqlalchemy.orm import subqueryload
+from sqlalchemy.orm import joinedload
+from sqlalchemy import and_, func, desc, asc
+from sqlalchemy.sql.expression import nullslast
 
 from app import auth, db
-from app.models import Exercise, Category, Rating
+from app.models import Exercise, Category, Rating, UserFavoriteExercise
 from app.serializers import (
     ExerciseSchema,
     Serializer,
@@ -58,30 +60,68 @@ def get_exercises(favorited_by=None, author_id=None):
     if favorited_by and favorited_by != user_id:
         raise AuthorizationError
 
-    search_params = request.args.get('search')
+    search = request.args.get('search')
     category = request.args.get('category')
-    order_by = request.args.get('order_by', 'added')
+    order_by = request.args.get('order_by')
 
     query = Exercise.query
-    query = Exercise.with_avg_rating(query, order_by == 'rating')
-    query = Exercise.search(search_params, query, order_by == 'search')
-    query = query.order_by(Exercise.created_at.desc())
+
+    if search:
+        search_terms = (' | ').join(search.split())
+        query = query.add_columns(func.ts_rank(
+            Exercise.tsv, func.to_tsquery(search_terms)).label('search_rank')).\
+            filter(Exercise.tsv.match(search_terms))
 
     if user_id:
-        query = Exercise.with_rating(query, auth.current_user.id)
-        # if favorited_by is set then we want only the authenticated users
-        # own favorites
-        query = Exercise.with_favorited(query, user_id, ownfavorites=bool(favorited_by))
+        query = query.add_columns(Rating.rating.label('my_rating')).\
+            outerjoin(Rating, and_(Rating.exercise_id == Exercise.id,
+                                   Rating.user_id == user_id))
+
+        # when if favorited_by is not None then we only want the user favorites
+        # and isouter will be set to False. Meaning we will do an inner join If
+        # favorited_by is None then isouter will be True and we will do an
+        # outer join meaning we want to know which exercises the user favorited
+        # but we want all of them.
+        isouter = not bool(favorited_by)
+
+        # include a column from the UserFavoriteExercise table or `0`.
+        # this will get serialized as a Boolean to signify favorited or not.
+        query = query.\
+            add_columns(func.coalesce(UserFavoriteExercise.exercise_id, 0).label('favorited')).\
+            join(UserFavoriteExercise,
+                 and_(UserFavoriteExercise.exercise_id == Exercise.id,
+                      UserFavoriteExercise.user_id == user_id),
+                 isouter=isouter)
 
     if author_id:
         query = query.filter(Exercise.author_id == author_id)
 
     if category:
-        query = query.join(Category).\
-            filter(Category.name == category)
+        query = query.join(Category).filter(Category.name == category)
 
     if 'author' in parse_query_params(request.args, key='expand'):
-        query = query.options(subqueryload(Exercise.author))
+        query = query.options(joinedload(Exercise.author))
+
+    # test for length and existence because NoneTypes and empty strings
+    # don't support indexing.
+    if order_by and len(order_by) > 1 and order_by[-1] in '+ -'.split():
+        orderfunc = desc if order_by[-1] == '-' else asc
+        order_by = order_by[:-1]
+    else:
+        orderfunc = desc
+
+    if order_by == 'my_rating':
+        query = query.order_by(nullslast(orderfunc('my_rating')))
+    elif order_by == 'avg_rating':
+        query = query.order_by(nullslast(orderfunc(Exercise.avg_rating)))
+    elif order_by == 'popularity':
+        query = query.order_by(nullslast(orderfunc(Exercise.popularity)))
+    elif order_by == 'updated_at':
+        query = query.order_by(orderfunc(Exercise.updated_at))
+    elif order_by == 'search':
+        query = query.order_by(nullslast(orderfunc('search_rank')))
+    else:
+        query = query.order_by(orderfunc(Exercise.created_at))
 
     page = Pagination(request, query=query)
     return Serializer(ExerciseSchema, request.args).dump_page(page)

@@ -15,7 +15,7 @@ from meta import Schema
 from validators import validate_unique
 
 
-def expandable(obj, attribute, expand, nested, route, route_kwargs):
+def expandable(obj, attribute, expand, nested, route, route_kwargs, many=False):
     '''Generate an external url if attribute is not in expand, otherwise
     serialize the expandable attribute.'''
 
@@ -24,7 +24,7 @@ def expandable(obj, attribute, expand, nested, route, route_kwargs):
                                  in route_kwargs.iteritems()})
         return url
 
-    field = fields.Nested(ExerciseSchema, many=True)
+    field = fields.Nested(nested, many=many)
     return field.serialize(attribute, obj)
 
 
@@ -76,8 +76,8 @@ class NumericRangeSchema(Schema):
 
 
 class ExerciseSchema(Schema):
-    title = fields.Str(required=True)
-    description = fields.Str(required=True)
+    title = fields.Str(required=True, validate=validate.Length(min=4))
+    description = fields.Str(required=True, validate=validate.Length(min=10))
     data = fields.Dict()
     group_exercise = fields.Boolean()
     private_exercise = fields.Boolean()
@@ -87,8 +87,9 @@ class ExerciseSchema(Schema):
 
     id = HashIDField(dump_only=True)
     favorited = fields.Bool(dump_only=True)
-    avg_rating = fields.Decimal(places=2, dump_only=True)
-    my_rating = fields.Integer(attribute='rating', dump_only=True)
+    avg_rating = fields.Float(places=2, dump_only=True)
+    popularity = fields.Float(places=2, dump_only=True)
+    my_rating = fields.Integer(attribute='my_rating', dump_only=True)
     edit_allowed = fields.Bool(dump_only=True)
     author = fields.Method('get_author', dump_only=True)
     href = fields.Function(lambda obj: make_url('v1.get_exercise', id=obj.id),
@@ -119,11 +120,12 @@ class ExerciseSchema(Schema):
                           route_kwargs={'id': 'author_id'})
 
     class Meta:
+        wrap = True
         additional = 'created_at', 'updated_at'
         dump_only = 'created_at', 'updated_at'
         related = 'author',
         meta = 'id', 'avg_rating', 'my_rating', 'href', 'favorited', \
-            'edit_allowed', 'created_at', 'updated_at',
+            'edit_allowed', 'created_at', 'updated_at', 'popularity'
 
 
 class UserSchema(Schema):
@@ -139,9 +141,11 @@ class UserSchema(Schema):
                           expand=self.expand,
                           nested=ExerciseSchema,
                           route='v1.get_exercises',
-                          route_kwargs={'author_id': 'id'})
+                          route_kwargs={'author_id': 'id'},
+                          many=True)
 
     class Meta:
+        wrap = True
         meta = 'id', 'href',
         related = 'authored_exercises',
 
@@ -159,13 +163,15 @@ class ProfileSchema(UserSchema):
                           expand=self.expand,
                           nested=ExerciseSchema,
                           route='v1.get_exercises',
-                          route_kwargs={'favorited_by': 'id'})
+                          route_kwargs={'favorited_by': 'id'},
+                          many=True)
 
     @validates_schema
     def validate(self, data):
         return validate_unique(self, data, models.User)
 
     class Meta:
+        wrap = True
         load_only = 'password',
         additional = 'created_at', 'updated_at', 'last_login',
         dump_only = 'created_at', 'updated_at', 'last_login',

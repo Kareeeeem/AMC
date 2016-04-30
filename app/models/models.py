@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 
 from psycopg2.extras import NumericRange
 from sqlalchemy import (
+    Float,
+    CheckConstraint,
     Boolean,
     Column,
     DateTime,
@@ -9,7 +11,6 @@ from sqlalchemy import (
     event,
     ForeignKey,
     ForeignKeyConstraint,
-    func,
     Index,
     Integer,
     String,
@@ -20,7 +21,7 @@ from sqlalchemy.dialects.postgresql import INT4RANGE, JSONB, TSVECTOR
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship, backref
-from sqlalchemy.sql.expression import nullslast
+# from sqlalchemy.sql.expression import nullslast
 
 from meta.columns import IDColumn, PasswordColumn
 from meta.mixins import TokenMixin, CreatedUpdatedMixin, CRUDMixin
@@ -122,7 +123,12 @@ class UserFavoriteExercise(Base):
 
 
 class Rating(Base):
-    rating = Column(Integer, nullable=False)
+    rating = Column(Integer,
+                    CheckConstraint('rating>0'),
+                    CheckConstraint('rating<6'),
+                    nullable=False,
+                    )
+
     user_id = Column(
         ID_TYPE,
         ForeignKey('user.id', ondelete='CASCADE'),
@@ -162,6 +168,8 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     private_exercise = Column(Boolean, default=False)
     duration = Column(INT4RANGE)
     tsv = Column(TSVECTOR)
+    avg_rating = Column(Float)
+    popularity = Column(Float)
 
     author_id = Column(ID_TYPE, ForeignKey('user.id'))
     category_id = Column(ID_TYPE, ForeignKey('category.id'))
@@ -170,7 +178,7 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
         backref='exercises',
         # we always want this but joinedload doesn't play nice with
         # some of the more complicated queries we're doing.
-        lazy='subquery',
+        lazy='joined',
     )
 
     @property
@@ -178,79 +186,6 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
         return self.category.name
 
     __table_args__ = Index('ix_exercise_tsv', 'tsv', postgresql_using='gin'),
-
-    @classmethod
-    def with_rating(cls, query, user_id):
-        '''Returns the query with the rating the user gave as an
-        additional column. It's important to note that the SQLAlchemy
-        results will be an iterable of tuples, instead of an iterable of
-        Exercises. '''
-
-        rating = query.session.\
-            query(Rating.exercise_id, Rating.rating).\
-            filter(Rating.user_id == user_id).\
-            subquery()
-
-        return query.add_columns(rating.c.rating).\
-            outerjoin(rating, rating.c.exercise_id == cls.id).\
-            group_by(rating.c.rating)
-
-    @classmethod
-    def with_avg_rating(cls, query, order_by=False):
-        '''Returns the query with the average rating as an additional column.
-        It's important to note that the SQLAlchemy results will be an iterable
-        of tuples, instead of an iterable of Exercises.
-        '''
-
-        avg_rating = query.session.\
-            query(Rating.exercise_id, func.avg(Rating.rating).label('avg_rating')).\
-            group_by(Rating.exercise_id).\
-            subquery()
-
-        query = query.add_columns(avg_rating.c.avg_rating).\
-            outerjoin(avg_rating, avg_rating.c.exercise_id == cls.id).\
-            group_by(cls, avg_rating.c.avg_rating)
-
-        if order_by:
-            query = query.order_by(nullslast(avg_rating.c.avg_rating.desc()))
-
-        return query
-
-    @classmethod
-    def with_favorited(cls, query, user_id, ownfavorites=False):
-        '''Returns the query with the favorited additional column, which will
-        be 1 or 0.  It's important to not that the SQLAlchemy results will be
-        an iterable of tuples, instead of an iterable of Exercises.
-        '''
-
-        # if we don't only want the users own favorites we want to do an outer
-        # join.
-        isouter = not bool(ownfavorites)
-
-        favorited = query.session.\
-            query(UserFavoriteExercise.exercise_id).\
-            filter_by(user_id=user_id).\
-            subquery()
-
-        return query.\
-            add_columns(func.count(favorited.c.exercise_id).label('favorited')).\
-            join(favorited, favorited.c.exercise_id == cls.id, isouter=isouter)
-
-    @classmethod
-    def search(cls, search_terms, query, order_by=False):
-        # TODO support more complex queries
-        # only support OR queries for now
-        # See pg docs http://www.postgresql.org/docs/9.5/static/textsearch.html
-
-        if search_terms:
-            search_terms = (' | ').join(search_terms.split())
-            query = query.filter(cls.tsv.match(search_terms))
-
-            if order_by:
-                query = query.order_by(
-                    func.ts_rank(cls.tsv, func.to_tsquery(search_terms)).desc())
-
-        return query
 
     @property
     def edit_allowed(self):
@@ -499,6 +434,96 @@ where(Choice.response_id == QuestionnaireResponse.id).as_scalar(), Integer)))
                     self.updated_at,
                 ))
 
+
+# create a function to calculate the bayesian score based on a 5 star rating
+# system.
+# http://julesjacobs.github.io/2015/08/17/bayesian-scoring-of-ratings.html
+# Will return the default popularity if id is NULL. Which is usefull for
+# setting it in a trigger.
+bayesian_ddl = '''
+CREATE OR REPLACE FUNCTION bayesian(id bigint) returns FLOAT AS $$
+DECLARE
+utilities INT[];
+pretend_votes INT[];
+votes_count INT[];
+votes INT[];
+sum_vu INT;
+ex_id BIGINT;
+does_exist BOOLEAN;
+BEGIN
+    ex_id := id;
+    utilities := '{-30, 2, 3, 4, 70}'::INT[];
+    pretend_votes := '{2, 2, 2, 2, 2}'::INT[];
+    SELECT INTO votes_count ARRAY[
+        coalesce(count(rating) filter (where rating = 1), 0),
+        coalesce(count(rating) filter (where rating = 2), 0),
+        coalesce(count(rating) filter (where rating = 3), 0),
+        coalesce(count(rating) filter (where rating = 4), 0),
+        coalesce(count(rating) filter (where rating = 5), 0)
+    ] FROM rating where exercise_id = ex_id;
+
+    SELECT INTO votes array(SELECT a+b FROM unnest(pretend_votes, votes_count) x(a,b));
+    SELECT INTO sum_vu SUM(v) FROM UNNEST(array(SELECT a*b FROM unnest(votes, utilities) x(a,b))) v;
+    RETURN sum_vu / (SELECT SUM(v)::FLOAT FROM UNNEST(votes) v);
+END;
+$$ LANGUAGE plpgsql strict;
+'''
+
+event.listen(Base.metadata, 'after_create', DDL(bayesian_ddl))
+event.listen(Base.metadata, 'after_drop', DDL('DROP FUNCTION IF EXISTS bayesian(bigint)'))
+
+drop_rating_trigger_ddl = 'DROP FUNCTION IF EXISTS rating_trigger()'
+create_rating_trigger_ddl = '''
+CREATE OR REPLACE FUNCTION rating_trigger() RETURNS trigger as $$
+BEGIN
+    IF (TG_OP = 'DELETE') THEN
+        UPDATE exercise
+        SET popularity=bayesian(old.exercise_id),avg_rating=(SELECT avg(rating) FROM rating WHERE exercise_id=old.exercise_id)
+        WHERE id=old.exercise_id;
+        RETURN OLD;
+    ELSE
+        UPDATE exercise
+        SET popularity=bayesian(new.exercise_id),avg_rating=(SELECT avg(rating) FROM rating WHERE exercise_id=new.exercise_id)
+        WHERE id=new.exercise_id;
+        RETURN new;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+'''
+
+drop_default_popularity_ddl = 'DROP FUNCTION IF EXISTS default_popularity()'
+create_default_popularity_ddl = '''
+CREATE OR REPLACE FUNCTION default_popularity() RETURNS trigger as $$
+BEGIN
+new.popularity := bayesian(new.id);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+'''
+
+drop_default_popularity_trigger_ddl = 'DROP TRIGGER IF EXISTS set_default_popularity ON %(table)s'
+create_default_popularity_trigger_ddl = '''
+CREATE TRIGGER set_default_popularity BEFORE INSERT
+ON %(table)s FOR EACH ROW EXECUTE PROCEDURE default_popularity();
+'''
+
+drop_set_ratings_ddl = 'DROP TRIGGER IF EXISTS set_ratings ON %(table)s'
+create_set_ratings_ddl = '''
+CREATE TRIGGER set_ratings AFTER INSERT OR UPDATE OR DELETE
+ON %(table)s FOR EACH ROW EXECUTE PROCEDURE rating_trigger();
+'''
+
+event.listen(Rating.__table__, 'after_create', DDL(create_rating_trigger_ddl))
+event.listen(Rating.__table__, 'after_create', DDL(create_set_ratings_ddl))
+event.listen(Rating.__table__, 'before_drop', DDL(drop_set_ratings_ddl))
+event.listen(Rating.__table__, 'before_drop', DDL(drop_rating_trigger_ddl))
+
+event.listen(Exercise.__table__, 'after_create', DDL(create_default_popularity_ddl))
+event.listen(Exercise.__table__, 'after_create', DDL(create_default_popularity_trigger_ddl))
+
+event.listen(Exercise.__table__, 'before_drop', DDL(drop_default_popularity_trigger_ddl))
+event.listen(Exercise.__table__, 'before_drop', DDL(drop_default_popularity_ddl))
 
 __all__ = [
     'Base',

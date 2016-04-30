@@ -46,7 +46,7 @@ drop_id_function_ddl = 'DROP FUNCTION IF EXISTS {id_function_signature}'
 Sequence(GLOBAL_SEQUENCE_NAME, metadata=db.Base.metadata)
 
 
-# Register an event on the metadata that executes the create_id_function_dll on
+# Register an event on the metadata that executes the create_id_function_ddl on
 # the database Before anything else is created.
 @event.listens_for(db.Base.metadata, 'before_create')
 @with_app_config('OBSCURE_ID_KEY', 'OBSCURE_ID_MODULUS')
@@ -59,7 +59,7 @@ def create_id(target, conn, **kwargs):
     conn.execute(ddl)
 
 
-# Register an event on the metadata that executes the drop_id_function_dll on
+# Register an event on the metadata that executes the drop_id_function_ddl on
 # the database after everything else is dropped. This way we avoid dependency
 # errors as the function will be used as a server default for certain columns.
 @event.listens_for(db.Base.metadata, 'after_drop')
