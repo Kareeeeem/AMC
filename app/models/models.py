@@ -21,7 +21,6 @@ from sqlalchemy.dialects.postgresql import INT4RANGE, JSONB, TSVECTOR
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship, backref
-# from sqlalchemy.sql.expression import nullslast
 
 from meta.columns import IDColumn, PasswordColumn
 from meta.mixins import TokenMixin, CreatedUpdatedMixin, CRUDMixin
@@ -123,11 +122,30 @@ class UserFavoriteExercise(Base):
 
 
 class Rating(Base):
-    rating = Column(Integer,
-                    CheckConstraint('rating>0'),
-                    CheckConstraint('rating<6'),
-                    nullable=False,
-                    )
+    rating = Column(
+        Float,
+        CheckConstraint('rating>=1'),
+        CheckConstraint('rating<=5'),
+        nullable=False,
+    )
+    effective = Column(
+        Integer,
+        CheckConstraint('effective>=1'),
+        CheckConstraint('effective<=5'),
+        nullable=False,
+    )
+    fun = Column(
+        Integer,
+        CheckConstraint('fun>=1'),
+        CheckConstraint('fun<=5'),
+        nullable=False,
+    )
+    clear = Column(
+        Integer,
+        CheckConstraint('clear>=1'),
+        CheckConstraint('clear<=5'),
+        nullable=False,
+    )
 
     user_id = Column(
         ID_TYPE,
@@ -162,14 +180,18 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     id = IDColumn()
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
-    data = Column(JSONB)
+    json = Column(JSONB)
     difficulty = Column(Integer, default=0)
     group_exercise = Column(Boolean, default=False)
     private_exercise = Column(Boolean, default=False)
     duration = Column(INT4RANGE)
     tsv = Column(TSVECTOR)
-    avg_rating = Column(Float)
     popularity = Column(Float)
+
+    avg_rating = Column(Float)
+    avg_fun_rating = Column(Float)
+    avg_clear_rating = Column(Float)
+    avg_effective_rating = Column(Float)
 
     author_id = Column(ID_TYPE, ForeignKey('user.id'))
     category_id = Column(ID_TYPE, ForeignKey('category.id'))
@@ -455,11 +477,11 @@ BEGIN
     utilities := '{-30, 2, 3, 4, 70}'::INT[];
     pretend_votes := '{2, 2, 2, 2, 2}'::INT[];
     SELECT INTO votes_count ARRAY[
-        coalesce(count(rating) filter (where rating = 1), 0),
-        coalesce(count(rating) filter (where rating = 2), 0),
-        coalesce(count(rating) filter (where rating = 3), 0),
-        coalesce(count(rating) filter (where rating = 4), 0),
-        coalesce(count(rating) filter (where rating = 5), 0)
+        coalesce(count(rating) filter (where rating >= 1 and rating < 1.5 ), 0),
+        coalesce(count(rating) filter (where rating >= 1.5 and rating < 2.5), 0),
+        coalesce(count(rating) filter (where rating >= 2.5 and rating < 3.5), 0),
+        coalesce(count(rating) filter (where rating >= 3.5 and rating < 4.5), 0),
+        coalesce(count(rating) filter (where rating >= 4.5 and rating <= 5), 0)
     ] FROM rating where exercise_id = ex_id;
 
     SELECT INTO votes array(SELECT a+b FROM unnest(pretend_votes, votes_count) x(a,b));
@@ -469,21 +491,26 @@ END;
 $$ LANGUAGE plpgsql strict;
 '''
 
-event.listen(Base.metadata, 'after_create', DDL(bayesian_ddl))
-event.listen(Base.metadata, 'after_drop', DDL('DROP FUNCTION IF EXISTS bayesian(bigint)'))
-
 drop_rating_trigger_ddl = 'DROP FUNCTION IF EXISTS rating_trigger()'
 create_rating_trigger_ddl = '''
 CREATE OR REPLACE FUNCTION rating_trigger() RETURNS trigger as $$
 BEGIN
     IF (TG_OP = 'DELETE') THEN
         UPDATE exercise
-        SET popularity=bayesian(old.exercise_id),avg_rating=(SELECT avg(rating) FROM rating WHERE exercise_id=old.exercise_id)
+        SET popularity=bayesian(old.exercise_id),
+            avg_rating=(SELECT avg(rating) FROM rating WHERE exercise_id=old.exercise_id),
+            avg_fun_rating=(SELECT avg(fun) FROM rating WHERE exercise_id=old.exercise_id),
+            avg_effective_rating=(SELECT avg(effective) FROM rating WHERE exercise_id=old.exercise_id),
+            avg_clear_rating=(SELECT avg(clear) FROM rating WHERE exercise_id=old.exercise_id)
         WHERE id=old.exercise_id;
         RETURN OLD;
     ELSE
         UPDATE exercise
-        SET popularity=bayesian(new.exercise_id),avg_rating=(SELECT avg(rating) FROM rating WHERE exercise_id=new.exercise_id)
+        SET popularity=bayesian(new.exercise_id),
+            avg_rating=(SELECT avg(rating) FROM rating WHERE exercise_id=new.exercise_id),
+            avg_fun_rating=(SELECT avg(fun) FROM rating WHERE exercise_id=new.exercise_id),
+            avg_effective_rating=(SELECT avg(effective) FROM rating WHERE exercise_id=new.exercise_id),
+            avg_clear_rating=(SELECT avg(clear) FROM rating WHERE exercise_id=new.exercise_id)
         WHERE id=new.exercise_id;
         RETURN new;
     END IF;
@@ -492,11 +519,33 @@ END;
 $$ LANGUAGE plpgsql;
 '''
 
+drop_set_ratings_ddl = 'DROP TRIGGER IF EXISTS set_ratings ON %(table)s'
+create_set_ratings_ddl = '''
+CREATE TRIGGER set_ratings AFTER INSERT OR UPDATE OR DELETE
+ON %(table)s FOR EACH ROW EXECUTE PROCEDURE rating_trigger();
+'''
+
+drop_set_avg_dll = 'DROP FUNCTION IF EXISTS set_avg()'
+set_avg_dll = '''
+CREATE OR REPLACE FUNCTION set_avg() RETURNS trigger AS $$
+BEGIN
+    new.rating := (new.fun + new.clear + new.effective) / 3.0;
+    RETURN new;
+END;
+$$ LANGUAGE plpgsql;
+'''
+
+drop_set_avg_trigger_dll = 'DROP TRIGGER IF EXISTS set_avg_trigger ON %(table)s'
+set_avg_trigger_dll = '''
+CREATE TRIGGER set_avg_trigger BEFORE INSERT OR UPDATE
+ON %(table)s FOR EACH ROW EXECUTE PROCEDURE set_avg();
+'''
+
 drop_default_popularity_ddl = 'DROP FUNCTION IF EXISTS default_popularity()'
 create_default_popularity_ddl = '''
 CREATE OR REPLACE FUNCTION default_popularity() RETURNS trigger as $$
 BEGIN
-new.popularity := bayesian(new.id);
+    new.popularity := bayesian(new.id);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -508,27 +557,28 @@ CREATE TRIGGER set_default_popularity BEFORE INSERT
 ON %(table)s FOR EACH ROW EXECUTE PROCEDURE default_popularity();
 '''
 
-drop_set_ratings_ddl = 'DROP TRIGGER IF EXISTS set_ratings ON %(table)s'
-create_set_ratings_ddl = '''
-CREATE TRIGGER set_ratings AFTER INSERT OR UPDATE OR DELETE
-ON %(table)s FOR EACH ROW EXECUTE PROCEDURE rating_trigger();
-'''
+event.listen(Base.metadata, 'after_create', DDL(bayesian_ddl))
+event.listen(Base.metadata, 'after_drop', DDL('DROP FUNCTION IF EXISTS bayesian(bigint)'))
 
 event.listen(Rating.__table__, 'after_create', DDL(create_rating_trigger_ddl))
 event.listen(Rating.__table__, 'after_create', DDL(create_set_ratings_ddl))
 event.listen(Rating.__table__, 'before_drop', DDL(drop_set_ratings_ddl))
 event.listen(Rating.__table__, 'before_drop', DDL(drop_rating_trigger_ddl))
 
+event.listen(Rating.__table__, 'after_create', DDL(set_avg_dll))
+event.listen(Rating.__table__, 'after_create', DDL(set_avg_trigger_dll))
+event.listen(Rating.__table__, 'before_drop', DDL(drop_set_avg_trigger_dll))
+event.listen(Rating.__table__, 'before_drop', DDL(drop_set_avg_dll))
+
 event.listen(Exercise.__table__, 'after_create', DDL(create_default_popularity_ddl))
 event.listen(Exercise.__table__, 'after_create', DDL(create_default_popularity_trigger_ddl))
-
 event.listen(Exercise.__table__, 'before_drop', DDL(drop_default_popularity_trigger_ddl))
 event.listen(Exercise.__table__, 'before_drop', DDL(drop_default_popularity_ddl))
 
 __all__ = [
     'Base',
-    'Choice',
     'Category',
+    'Choice',
     'db',
     'Exercise',
     'MaxEditTimeExpiredError',

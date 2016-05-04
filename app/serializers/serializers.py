@@ -78,7 +78,7 @@ class NumericRangeSchema(Schema):
 class ExerciseSchema(Schema):
     title = fields.Str(required=True, validate=validate.Length(min=4))
     description = fields.Str(required=True, validate=validate.Length(min=10))
-    data = fields.Dict()
+    json = fields.Dict()
     group_exercise = fields.Boolean()
     private_exercise = fields.Boolean()
     difficulty = fields.Integer()
@@ -89,11 +89,14 @@ class ExerciseSchema(Schema):
     favorited = fields.Bool(dump_only=True)
     avg_rating = fields.Float(places=2, dump_only=True)
     popularity = fields.Float(places=2, dump_only=True)
-    my_rating = fields.Integer(attribute='my_rating', dump_only=True)
     edit_allowed = fields.Bool(dump_only=True)
     author = fields.Method('get_author', dump_only=True)
     href = fields.Function(lambda obj: make_url('v1.get_exercise', id=obj.id),
                            dump_only=True)
+    rating = fields.Function(lambda obj: make_url('v1.rate_exercise', id=obj.id),
+                             dump_only=True)
+
+    user_rating = fields.Nested('RatingSchema', attribute='Rating', dump_only=True)
 
     @post_load
     def set_category(self, data):
@@ -123,8 +126,8 @@ class ExerciseSchema(Schema):
         wrap = True
         additional = 'created_at', 'updated_at'
         dump_only = 'created_at', 'updated_at'
-        related = 'author',
-        meta = 'id', 'avg_rating', 'my_rating', 'href', 'favorited', \
+        related = 'author', 'rating',
+        meta = 'id', 'avg_rating', 'user_rating', 'href', 'favorited', \
             'edit_allowed', 'created_at', 'updated_at', 'popularity'
 
 
@@ -191,9 +194,14 @@ class ActionSchema(Schema):
 
 
 class RatingSchema(Schema):
-    rating = fields.Integer(required=True)
+    rating = fields.Float(required=True, dump_only=True)
+    fun = fields.Integer(required=True)
+    clear = fields.Integer(required=True)
+    effective = fields.Integer(required=True)
 
-    @validates('rating')
+    @validates('clear')
+    @validates('fun')
+    @validates('effective')
     def validate_rating(self, value):
         if value < 1 or value > 5:
             raise ValidationError('Rating must be larger than zero and lower than 5')

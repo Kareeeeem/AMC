@@ -64,6 +64,12 @@ def get_exercises(favorited_by=None, author_id=None):
     category = request.args.get('category')
     order_by = request.args.get('order_by')
 
+    orderfunc = desc
+    if order_by and len(order_by) > 0 and order_by[-1] in '+ -'.split():
+        if order_by[-1] == '+':
+            orderfunc = asc
+        order_by = order_by[:-1]
+
     query = Exercise.query
 
     if search:
@@ -73,9 +79,18 @@ def get_exercises(favorited_by=None, author_id=None):
             filter(Exercise.tsv.match(search_terms))
 
     if user_id:
-        query = query.add_columns(Rating.rating.label('my_rating')).\
+        query = query.add_entity(Rating).\
             outerjoin(Rating, and_(Rating.exercise_id == Exercise.id,
                                    Rating.user_id == user_id))
+
+        if order_by == 'user_rating':
+            query = query.order_by(nullslast(orderfunc(Rating.rating)))
+        elif order_by == 'fun_rating':
+            query = query.order_by(nullslast(orderfunc(Rating.fun)))
+        elif order_by == 'effective_rating':
+            query = query.order_by(nullslast(orderfunc(Rating.effective)))
+        elif order_by == 'clear_rating':
+            query = query.order_by(nullslast(orderfunc(Rating.clear)))
 
         # when if favorited_by is not None then we only want the user favorites
         # and isouter will be set to False. Meaning we will do an inner join If
@@ -102,17 +117,7 @@ def get_exercises(favorited_by=None, author_id=None):
     if 'author' in parse_query_params(request.args, key='expand'):
         query = query.options(joinedload(Exercise.author))
 
-    # test for length and existence because NoneTypes and empty strings
-    # don't support indexing.
-    if order_by and len(order_by) > 1 and order_by[-1] in '+ -'.split():
-        orderfunc = desc if order_by[-1] == '-' else asc
-        order_by = order_by[:-1]
-    else:
-        orderfunc = desc
-
-    if order_by == 'my_rating':
-        query = query.order_by(nullslast(orderfunc('my_rating')))
-    elif order_by == 'avg_rating':
+    if order_by == 'avg_rating':
         query = query.order_by(nullslast(orderfunc(Exercise.avg_rating)))
     elif order_by == 'popularity':
         query = query.order_by(nullslast(orderfunc(Exercise.popularity)))
@@ -197,7 +202,9 @@ def rate_exercise(id):
         rating = Rating(exercise_id=exercise.id, user_id=auth.current_user.id)
         db.session.add(rating)
 
-    rating.rating = data['rating']
+    for key, value in data.iteritems():
+        setattr(rating, key, value)
+
     db.session.commit()
     return {}, 204
 

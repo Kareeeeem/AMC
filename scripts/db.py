@@ -43,7 +43,12 @@ def generate_exercises(users, amount=1000):
 
 def generate_ratings(users, exercises):
     db_.session.add_all(
-        models.Rating(user=user, exercise=exercise, rating=random.choice((1, 2, 3, 4, 5)))
+        models.Rating(user=user,
+                      exercise=exercise,
+                      fun=random.choice((1, 2, 3, 4, 5)),
+                      clear=random.choice((1, 2, 3, 4, 5)),
+                      effective=random.choice((1, 2, 3, 4, 5)),
+                      )
         for exercise in exercises
         for user in users
         # randomize the mount of ratings a bit. Every user should rate about
@@ -93,6 +98,8 @@ def fill(obj):
         db_.session.add(amisos)
 
     db_.session.commit()
+    click.echo('Inserted {} users and {} exercises.'.format(useramount,
+                                                            exerciseamount))
 
 
 @db.command()
