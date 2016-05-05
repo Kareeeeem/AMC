@@ -222,12 +222,12 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
         return (datetime.utcnow() - self.created_at) < self.MAX_EDIT_TIME
 
     def __repr__(self):
-        return ('Exercise(id=%r, title=%r, description=%r, data=%r, '
+        return ('Exercise(id=%r, title=%r, description=%r, json=%r, '
                 'author_id=%r, created_at=%r, updated_at=%r)' % (
                     self.id,
                     self.title,
                     self.description,
-                    self.data,
+                    self.json,
                     self.author_id,
                     self.created_at,
                     self.updated_at,
@@ -287,19 +287,30 @@ class Questionnaire(Base):
         passive_deletes=True,
     )
 
-    def __init__(self, **kwargs):
-        questions = kwargs.pop('questions')
-        self.questions = [Question(**question) for question in questions]
+    @classmethod
+    def create(cls, session, data):
+        questions = [Question(**question) for question in data.pop('questions')]
+        scores = [Score(
+            name=score['name'],
+            range=NumericRange(score['min'], score.get('max', None), bounds='[]')
+        ) for score in data.pop('scores')]
 
-        scores = kwargs.pop('scores')
-        for score in scores:
-            range = NumericRange(lower=score['min'],
-                                 upper=score.get('max', None),
-                                 bounds='[]')
-            self.possible_scores.append(Score(name=score['name'], range=range))
+        data.update(questions=questions)
+        data.update(possible_scores=scores)
+        return cls(**data)
 
-        for key, value in kwargs.iteritems():
-            setattr(self, key, value)
+    # def __init__(self, **kwargs):
+    #     questions = kwargs.pop('questions')
+    #     self.questions = [Question(**question) for question in questions]
+
+    #     for score in scores:
+    #         range = NumericRange(lower=score['min'],
+    #                              upper=score.get('max', None),
+    #                              bounds='[]')
+    #         self.possible_scores.append(Score(name=score['name'], range=range))
+
+    #     for key, value in kwargs.iteritems():
+    #         setattr(self, key, value)
 
     def __repr__(self):
         return ('Questionnaire(id=%r, title=%r, description=%r, version=%r)' % (
@@ -447,6 +458,12 @@ where(Choice.response_id == QuestionnaireResponse.id).as_scalar(), Integer)))
         ForeignKey('questionnaire.id', ondelete='CASCADE'),
         nullable=False
     )
+
+    @classmethod
+    def create(cls, session, data):
+        choices = [Choice(**choice) for choice in data.pop('choices')]
+        data.update(choices=choices)
+        return cls(**data)
 
     def __init__(self, **kwargs):
         choices = kwargs.pop('choices')

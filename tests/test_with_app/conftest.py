@@ -54,7 +54,7 @@ def amisos(session):
     basedir = os.path.abspath(os.path.dirname(__file__))
     with open(os.path.join(basedir, 'amisos.json')) as amisos_json:
         data = json.load(amisos_json)
-        amisos = models.Questionnaire(**data)
+        amisos = models.Questionnaire.create(session, data)
         session.add(amisos)
     session.commit()
     yield amisos
