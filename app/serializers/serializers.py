@@ -87,8 +87,6 @@ class ExerciseSchema(Schema):
 
     id = HashIDField(dump_only=True)
     favorited = fields.Bool(dump_only=True)
-    avg_rating = fields.Float(places=2, dump_only=True)
-    popularity = fields.Float(places=2, dump_only=True)
     edit_allowed = fields.Bool(dump_only=True)
     author = fields.Method('get_author', dump_only=True)
     href = fields.Function(lambda obj: make_url('v1.get_exercise', id=obj.id),
@@ -96,7 +94,9 @@ class ExerciseSchema(Schema):
     rating = fields.Function(lambda obj: make_url('v1.rate_exercise', id=obj.id),
                              dump_only=True)
 
-    user_rating = fields.Nested('RatingSchema', attribute='Rating', dump_only=True)
+    popularity = fields.Float(dump_only=True)
+    user_rating = fields.Nested('RatingSchema', dump_only=True)
+    average_rating = fields.Nested('RatingSchema', dump_only=True)
 
     @post_load
     def set_category(self, data):
@@ -127,8 +127,10 @@ class ExerciseSchema(Schema):
         additional = 'created_at', 'updated_at'
         dump_only = 'created_at', 'updated_at'
         related = 'author', 'rating',
-        meta = 'id', 'avg_rating', 'user_rating', 'href', 'favorited', \
-            'edit_allowed', 'created_at', 'updated_at', 'popularity'
+        meta = 'id', 'average_rating', 'user_rating', 'href', 'favorited', \
+            'edit_allowed', 'created_at', 'updated_at', 'popularity', \
+            'avg_fun_rating', 'avg_effective_rating', 'avg_clear_rating', \
+            'avg_rating'
 
 
 class UserSchema(Schema):

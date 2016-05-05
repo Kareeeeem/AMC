@@ -123,12 +123,14 @@ class UserFavoriteExercise(Base):
 
 
 class Rating(Base):
+    # set by trigger
     rating = Column(
         Float,
         CheckConstraint('rating>=1'),
         CheckConstraint('rating<=5'),
         nullable=False,
     )
+
     effective = Column(
         Integer,
         CheckConstraint('effective>=1'),
@@ -186,23 +188,27 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     group_exercise = Column(Boolean, default=False)
     private_exercise = Column(Boolean, default=False)
     duration = Column(INT4RANGE)
+
+    author_id = Column(ID_TYPE, ForeignKey('user.id'))
+    category = relationship('Category', backref='exercises', lazy='joined')
+    category_id = Column(ID_TYPE, ForeignKey('category.id'))
+
+    # set by triggers
     tsv = Column(TSVECTOR)
     popularity = Column(Float)
-
     avg_rating = Column(Float)
     avg_fun_rating = Column(Float)
     avg_clear_rating = Column(Float)
     avg_effective_rating = Column(Float)
 
-    author_id = Column(ID_TYPE, ForeignKey('user.id'))
-    category_id = Column(ID_TYPE, ForeignKey('category.id'))
-    category = relationship(
-        'Category',
-        backref='exercises',
-        # we always want this but joinedload doesn't play nice with
-        # some of the more complicated queries we're doing.
-        lazy='joined',
-    )
+    @property
+    def average_rating(self):
+        return dict(
+            rating=self.avg_rating,
+            fun=self.avg_fun_rating,
+            clear=self.avg_clear_rating,
+            effective=self.avg_effective_rating,
+        )
 
     @property
     def category_name(self):

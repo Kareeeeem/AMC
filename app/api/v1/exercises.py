@@ -1,5 +1,5 @@
 from flask import request
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, aliased
 from sqlalchemy import and_, func, desc, asc
 from sqlalchemy.sql.expression import nullslast
 
@@ -79,18 +79,20 @@ def get_exercises(favorited_by=None, author_id=None):
             filter(Exercise.tsv.match(search_terms))
 
     if user_id:
-        query = query.add_entity(Rating).\
-            outerjoin(Rating, and_(Rating.exercise_id == Exercise.id,
-                                   Rating.user_id == user_id))
+        user_rating = aliased(Rating, name='user_rating')
+
+        query = query.add_entity(user_rating).\
+            outerjoin(user_rating, and_(user_rating.exercise_id == Exercise.id,
+                                        user_rating.user_id == user_id))
 
         if order_by == 'user_rating':
-            query = query.order_by(nullslast(orderfunc(Rating.rating)))
-        elif order_by == 'fun_rating':
-            query = query.order_by(nullslast(orderfunc(Rating.fun)))
-        elif order_by == 'effective_rating':
-            query = query.order_by(nullslast(orderfunc(Rating.effective)))
-        elif order_by == 'clear_rating':
-            query = query.order_by(nullslast(orderfunc(Rating.clear)))
+            query = query.order_by(nullslast(orderfunc(user_rating.rating)))
+        elif order_by == 'user_fun_rating':
+            query = query.order_by(nullslast(orderfunc(user_rating.fun)))
+        elif order_by == 'user_effective_rating':
+            query = query.order_by(nullslast(orderfunc(user_rating.effective)))
+        elif order_by == 'user_clear_rating':
+            query = query.order_by(nullslast(orderfunc(user_rating.clear)))
 
         # when if favorited_by is not None then we only want the user favorites
         # and isouter will be set to False. Meaning we will do an inner join If

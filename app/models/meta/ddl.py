@@ -4,7 +4,7 @@
 # Will return the default popularity if id is NULL. Which is usefull for
 # setting it in a trigger.
 
-UTILITIES = '-5, 2, 3, 4 10'
+UTILITIES = '-5, 2, 3, 4, 10'
 PRETEND_VOTES = '1, 1, 1, 1, 1'
 
 bayesian = '''
