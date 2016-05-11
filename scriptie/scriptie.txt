@@ -1,0 +1,25 @@
+Voorwoord
+Inleiding
+Vraagstuk
+    Probleem
+    Hoofd/deelvragen
+    Design challenge
+    Haalbaarheid/MoSCoW
+Oriëntatie
+    Domein
+    Technology stack
+Database
+    ID generatie
+    Zoekmachine
+    Beoordelings algoritme
+Server applicatie
+    Communicatie met database
+    ID generatie
+    Authenticatie
+    REST
+    JSON representatie van resources
+Frontend client
+    Authenticatie
+    Communicatie met server
+    Design
+    UX

@@ -1,0 +1,94 @@
+PostgreSQL
+PostgreSQL is een relationele database zeer geschikt voor het opslaan van data met veel onderlinge relaties zoals author hebben blogposts, of blogpost heeft tags en een tag heeft blogposts. Het biedt de functionaliteit om een zoekmachine te faciliteren zonder extra exerne programma's. Het biedt ook een aantal datatypes aan die zeer handig zijn zoals JSON en JSONB, deze maken het mogelijk om arbitraire data op te slaan, en range types om bijvoorbeeld duraties aan te geven (0 tot 5 minuten, 5 tot 15 minuten). Het is tevens gratis en heeft een vrije liscenties om het te gebruiken in vrije, gesloten maar ook commerciële applicaties.
+
+Datamodel
+De applicatie betreft hoofdzakelijk gebruikers, oefeningen en vragenlijsten. Maar voor een goede vertegenwoordiging van deze zijn ook beoordelingen en categoriën nodig om de oefeningen te beschrijven. En vragen, antwoorden, scores en gegeven antwoorden om het vragenlijst systeem compleet te maken. Deze entities zijn elk vertegenwoordigd door een tabel in de database en zijn onderling verbonden middels relaties. Naast deze tabellen zijn er ook een aantal procedures aangemaakt in de database om bepaalde velden automatisch in te vullen aan de hand van gegeven informatie. Wat volgt is een korte beschrijving van alle tabellen en eventueel de bijbehorende procedures. Hier beperk ik mij tot de noodzakelijke velden en de velden waarbij consequentiële keuzes zijn gemaakt. Een uitgebrijde ERD (Entiry Relationship Diagram) is te vinden in de bijlagen.
+
+ID generatie
+TODO Leg id generatie algoritme uit. Vertel waarom. In het kort, het voorkomt dat mensen willekeurige ids proberen en andere resources zo ontdekken. Resultaat is een semi-random Integer voor elke id.
+
+Gebruikers
+Een 'user' wordt gekenmerkt door een 'username', een 'email' en een 'password'. Een deel van de doelgroep gaf aan dat ze liever op een anonieme wijze gebruik wilden maken van de app. De username is dus een naam wat van alles kan zijn. Het email adres is daarom ook niet verplicht. Websites als reddit.com en news.ycombinator.com doen dit ook. Een wachtwoord vergeten flow, of het versturen van nieuwsberichten is dus alleen mogelijk wanneer er een email adres bekend is. Maar omdat voor de kern van de applicatie niet meer nodig is dan een username is deze keuze gemaakt. De password is uiteraard opgeslagen als een hash, hierover meer in het hoofdstuk over de server applicatie, deze genereerd de hash.
+
+Oefeningen
+'Exercises' zijn de kern van de applicatie. Deze tabel is daarom het meest complex. De 'title', 'description' en 'category' spreken voor zich. De tabel heeft een relatie met 'user' die aangeeft welke autheur de oefening heeft toegevoegd. De opdrachtgever wilde naast deze een aantal extra kenmerkende velden om de vindbaarheid en categorisering te verbeteren.
+difficulty: Elke oefening heeft een 'difficulty' van 0 tot en met 2 (drie waardes). Dit kwam voort uit een angst van de doelgroep dat het voor onervaren patiënten averechts zou kunnen werken als zij nietsvermoedend een zeer confronterende oefening zouden doen.
+private/group: Een oefening wordt ook beschreven als 'private', of als 'group_exercise' oefening. Deze velden zijn zogenaamde boolean (aan/uit) velden en geven respectievelijk aan of een oefening misschien beter niet in het openbaar gedaan kan worden, of dat er meerdere mensen voor nodig zijn. Het defineren van deze velden is een direct resultaat van een focus group sessie met de doelgroep. Het was voor sommigen van hen van belang om te weten in wat voor context de oefening kon plaatsvinden bij het zoeken naar een geschikte oefening bij hun huidige situatie en stemming.
+duration: De duratie is een range data type, een zeer handige feature van Postgres. Een opdracht kan dus beschreven worden als durende 5 tot 15 minuten in één veld. We kunnen ook oefeningen opvragen die in een bereik vallen.
+tsv: Het 'tsv' veld staat voor tsvector. Dit is een data type waar een een text wordt opgebroken in lexemen, in ons geval de titel en bescrhrijving. "Een lexeem is een combinatie van fonemen, morfemen en lettertekens, die min of meer overeenkomt met wat op lexicaal niveau een woord wordt genoemd." Een voorbeeld zal duidelijker zijn. Stel voor een oefening met een titel "Tellen op je hoofd" en een beschrijving "Wanneer je op je hoofd bent gaan staan, tel dan van 100 heel snel naar 0". Postgres zal dan de volgende tsvector genereren: '0':20B '100':16B 'bent':10B 'gan':11B 'hel':17B 'hoofd':4A,9B 'snel':18B 'stan':12B 'tel':13B 'tell':1A 'wanner':5B. De letters die zijn toegekend geven de lexemen een waarde aan de hand van of deze in de titel of beschrijving is gevonden, de nummers geven de positie aan in het document; de title + beschrijving in dit geval. Dit maakt het mogelijk de oefening te vinden met verschillende vormen van de woorden, en de resulaten te ordenen op relevantie.
+popularity: Een ander veld dat essentieel is voor de vindbaarheid is de 'popularity'. De popularity is een functie van het aantal beoordelingen, de waarde toegekend aan de mogelijke beoordelingen en een default set beoordelingen. Deze wordt automatisch toegekend bij het toevoegen van een beoordeling.
+
+Beoordeling
+De 'rating' tabel heeft een relatie met 'exercise' en 'user'. Voor elke combinatie van gebruiker en oefening kan er maar één beoordeling bestaan. De opdrachtgever wilde een compositiete beoordeling. Dit betekend dat de beoordeling bestaat uit een aantal beoordelingen:
+* Leuk: 1-5
+* Duidelijk: 1-5
+* Effectief: 1-5
+De gebruiker geeft dan onafhandelijk van elkaar aan hoe leuk, duidelijk en effectief de oefening was en een gemiddelde hiervan vormt de algemene beoordeling. Dit heeft een aantal voordelen; de gebruiker wordt geleid in het geven van een betekenisvolle beoordeling, de algemene beoordelingen zijn specifieker dan een 1-5 punten systeem, het wordt mogelijk om afzonderlijk te sorteren op leuk/duidelijk/effectief.
+Bij het toevoegen of aanpassen van een beoordeling aan een oefening wordt er door de database automatisch een algeheel gemiddelde berekend van de alle algemene/leuk/effectief/duidelijk beoordelingen en worden gekoppeld aan de oefening in kwestie. Dit alleen is echter niet genoeg om een goede weergave te geven van hoe deze oefening wordt gewaardeerd. Een oefening met één beoordeling van 5.0 punten heeft ook een gemiddelde van 5.0 punten en zal altijd boven een oefening staan met 99 5.0 punten beoordelingen en één van 4.6. In mijn onderzoek kwam ik een populair artiekel tegen van Evan Miller, "How Not To Sort By Average Rating". De wiskundige theorie was echter zeer ingewikkeld en het betrof alleen 2 punt beoordeling systemen zoals up- en downvotes. Het bracht me echter wel op het spoor om verder te zoeken naar clarificaties en geschiktere methodes.
+Ik kwam al gauw uit op het volgende artiekel "Bayesian ranking of items with up and downvotes or 5 star ratings" van Jules Jacobs, die het vorige artiekel aanhaalt. Hij geeft een oplossing welke algemeen is, en toe te passen om allerlij soorten beoordeling systemen, inclusief ons composiet systeem en te implementeren in een database procedure.
+In het kort gaat deze aanpak over de onzekerheid de populariteit van oefeningen met weinig of geen beoordelingen. Deze onzekerheid wordt dan gekwantificeerd met een Betaverdeling van Beta(aantal_positief_assumptie, aantal_negatief_assumptie) en wanneer de echte beoordelingen binnenkomen wordt deze verdeling Beta(aantal_positief_assumptie + aantal_positief, aantal_negatief_assumptie + aantal_negatief). Door aan de mogelijke beoordelingen een 'utitily' toe te kennen, bijvoorbeeld een 1 weegt -10, 2 weegt 2, 3 weegt 3 4 weegt 4 en 5 weegt +10 kunnen we de oefeningen sorteren op in de volgende stappen.
+
+for i in 0..5: votes[i] = real_votes[i] + pretend_votes[i]
+score = sum(utilities[i] * votes[i] for i in 0..5) / sum(votes[i] for i in 0..5)
+
+Deze berekening voeren we uit bij elke toegevoede of aangepaste rating en omdat de echte beoordelingen decimalen wordt alles onder .5 naar onderen en alles boven .5 naar boven afgerond. De SQL is als volgt.
+
+CREATE OR REPLACE FUNCTION bayesian(id bigint) returns FLOAT AS $$
+DECLARE
+utilities INT[];
+pretend_votes INT[];
+votes_count INT[];
+votes INT[];
+sum_vu INT;
+ex_id BIGINT;
+does_exist BOOLEAN;
+BEGIN
+    ex_id := id;
+    utilities := '{-10, 2, 3, 4, +10}'::INT[];
+    pretend_votes := '{2, 2, 2, 2, 2}'::INT[];
+    SELECT INTO votes_count ARRAY[
+        coalesce(count(rating) filter (where rating >= 1 and rating < 1.5), 0),
+        coalesce(count(rating) filter (where rating >= 1.5 and rating < 2.5), 0),
+        coalesce(count(rating) filter (where rating >= 2.5 and rating < 3.5), 0),
+        coalesce(count(rating) filter (where rating >= 3.5 and rating < 4.5), 0),
+        coalesce(count(rating) filter (where rating >= 4.5 and rating <= 5), 0)
+    ] FROM rating where exercise_id = ex_id;
+
+    SELECT INTO votes array(SELECT a+b FROM unnest(pretend_votes, votes_count) x(a,b));
+    SELECT INTO sum_vu SUM(v) FROM UNNEST(array(SELECT a*b FROM unnest(votes, utilities) x(a,b))) v;
+    RETURN sum_vu / (SELECT SUM(v)::FLOAT FROM UNNEST(votes) v);
+END;
+$$ LANGUAGE plpgsql strict;
+
+Vragenlijst
+Het 'questionnaire' system is relatief simpel. Elke vragenlijst heeft een titel en een versie nummer. Het versie nummer zorgt ervoor dat voor aanpassingen aan de vragenlijst de bijbehorende antwoorden niet veranderen wanneer de vragenlijst wordt veranderd.
+
+Vraag
+Een 'question' heeft een relatie met 'questionnaire'. Een vraag heeft een tekst en een nummer die de plaats binnen de vragenlijst aanduidt.
+
+Antwoord
+Een 'option' heeft meerdere 'option's. Een option heeft een tekst en een nummerieke waarde. De vraag "Hoe warm is het" kan dan de antwoorden: 1: niet, 2: beetje, 3: heel, hebben.
+
+Score
+Een 'score' is een potientiele score voor een vragenlijst. Bijvoorbeeld wanneer alle gekozen antwoorden bij elkaar een waarde van 12 hebben kan er gedefineerd zijn dat bij een vragenlijst een score van tussen 10 en 15 betekend dat je geweldig bent.
+
+Deze tabellen maken onderling een vragenlijst op.
+
+Ingevulde vragenlijst
+Een 'questionnaire_response' refereert naar een vragenlijst en een gebruiker. Er wordt ook bijgehouden wanneer deze is ingevuld.
+
+Keuze
+Een 'choice' refereert naar een antwoord en een ingevulde vragenlijst. Een ingevulde vragenlijst heeft meerdere choices.
+
+Deze twee tabellen maken onderling een ingevulde vragenlijst. Door de scores van de antwoorden die bij de keuzes horen bij elkaar op te tellen wordt de score van een ingevulde vragenlijst berekend.
+
+De opdrachtgever werkt uitsluitend met multiple choice vragen met voor elke keuze een nummerieke waarde. Er is dus geen ondersteuning voor textuele antwoorden op vragen van de gebruiker.
+
+https://nl.wikipedia.org/wiki/Bayesiaanse_statistiek
+https://nl.wikipedia.org/wiki/B%C3%A8taverdeling
+https://nl.wikipedia.org/wiki/Lexeem
+http://www.postgresql.org
+http://www.reddit.com
+http://news.ycombinator.com
+http://julesjacobs.github.io/2015/08/17/bayesian-scoring-of-ratings.html
+http://www.evanmiller.org/how-not-to-sort-by-average-rating.html
