@@ -122,7 +122,7 @@ class UserFavoriteExercise(Base):
         ))
 
 
-class Rating(Base):
+class Rating(Base, CreatedUpdatedMixin):
     # set by trigger
     rating = Column(
         Float,
