@@ -24,10 +24,8 @@ def generate_users(amount=100):
 def generate_exercises(users, amount=1000):
     categories = [
         models.Category(name=name) for name in
-        'relaxatie concentratie associatie confrontatie'.split()
+        'relaxatie concentratie associatie confrontatie overig'.split()
     ]
-    categories.append(None)
-
     ranges = [NumericRange(0, 5), NumericRange(5, 15), NumericRange(15, None)]
 
     exercises = [models.Exercise(title='title%s' % i,
@@ -94,7 +92,7 @@ def fill(obj):
     basedir = os.path.abspath(os.path.dirname(__file__))
     with open(os.path.join(basedir, 'amisos.json')) as amisos_json:
         data = json.load(amisos_json)
-        amisos = models.Questionnaire(**data)
+        amisos = models.Questionnaire.create(db_.session, data)
         db_.session.add(amisos)
 
     db_.session.commit()

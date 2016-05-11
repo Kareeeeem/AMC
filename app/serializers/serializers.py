@@ -108,11 +108,10 @@ class ExerciseSchema(Schema):
 
     @validates('category')
     def validate_category(self, value):
-        if value:
-            categories = [c.name for c in models.Category.query.all()]
-            if value not in categories:
-                msg = 'category must be one of: {}.'.format(', '.join(categories))
-                raise ValidationError(msg)
+        categories = [c.name for c in models.Category.query.all()]
+        if value not in categories:
+            msg = 'category must be one of: {}.'.format(', '.join(categories))
+            raise ValidationError(msg)
 
     def get_author(self, obj):
         return expandable(obj,
@@ -146,7 +145,7 @@ class UserSchema(Schema):
                           expand=self.expand,
                           nested=ExerciseSchema,
                           route='v1.get_exercises',
-                          route_kwargs={'author_id': 'id'},
+                          route_kwargs={'author': 'username'},
                           many=True)
 
     class Meta:
@@ -201,12 +200,22 @@ class RatingSchema(Schema):
     clear = fields.Integer(required=True)
     effective = fields.Integer(required=True)
 
-    @validates('clear')
-    @validates('fun')
-    @validates('effective')
-    def validate_rating(self, value):
+    @staticmethod
+    def validate_rating(value):
         if value < 1 or value > 5:
-            raise ValidationError('Rating must be larger than zero and lower than 5')
+            raise ValidationError('Valid ratings are from 1 to 5.')
+
+    @validates('fun')
+    def validate_fun(self, value):
+        return self.validate_rating(value)
+
+    @validates('clear')
+    def validate_clear(self, value):
+        return self.validate_rating(value)
+
+    @validates('effective')
+    def validate_effective(self, value):
+        return self.validate_rating(value)
 
 
 class PaginationSchema(Schema):

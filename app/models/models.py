@@ -38,7 +38,7 @@ class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
     id = IDColumn()
     password = PasswordColumn()
 
-    username = Column(String(32), unique=True, nullable=False)
+    username = Column(String(32), unique=True, nullable=False, index=True)
     email = Column(String, unique=True)
     last_login = Column(DateTime)
 

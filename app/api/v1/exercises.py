@@ -1,10 +1,10 @@
-from flask import request
+from flask import request, abort
 from sqlalchemy.orm import joinedload, aliased
 from sqlalchemy import and_, func, desc, asc
 from sqlalchemy.sql.expression import nullslast
 
 from app import auth, db
-from app.models import Exercise, Category, Rating, UserFavoriteExercise
+from app.models import Exercise, Category, Rating, UserFavoriteExercise, User
 from app.serializers import (
     ExerciseSchema,
     Serializer,
@@ -12,6 +12,7 @@ from app.serializers import (
     RatingSchema,
 )
 from app.lib import (
+    setattr_and_return,
     parse_query_params,
     AuthorizationError,
     Pagination,
@@ -48,9 +49,8 @@ def post_exercises():
 
 @v1.route('/exercises', methods=['GET'])
 @v1.route('/users/<hashid:favorited_by>/favorites', methods=['GET'])
-@v1.route('/users/<hashid:author_id>/exercises', methods=['GET'])
 @auth.token_optional
-def get_exercises(favorited_by=None, author_id=None):
+def get_exercises(favorited_by=None):
     '''Get exercise collection, if favorited_by is set then get the
     collection of favorites of the user.'''
 
@@ -63,6 +63,7 @@ def get_exercises(favorited_by=None, author_id=None):
     search = request.args.get('search')
     category = request.args.get('category')
     order_by = request.args.get('order_by')
+    author = request.args.get('author')
 
     orderfunc = desc
     if order_by and len(order_by) > 0 and order_by[-1] in '+ -'.split():
@@ -77,6 +78,9 @@ def get_exercises(favorited_by=None, author_id=None):
         query = query.add_columns(func.ts_rank(
             Exercise.tsv, func.to_tsquery(search_terms)).label('search_rank')).\
             filter(Exercise.tsv.match(search_terms))
+
+        if order_by == 'relevance':
+            query = query.order_by(nullslast(orderfunc('search_rank')))
 
     if user_id:
         user_rating = aliased(Rating, name='user_rating')
@@ -110,23 +114,28 @@ def get_exercises(favorited_by=None, author_id=None):
                       UserFavoriteExercise.user_id == user_id),
                  isouter=isouter)
 
-    if author_id:
-        query = query.filter(Exercise.author_id == author_id)
+    if author:
+        query = query.join(User, and_(User.id == Exercise.author_id, User.username == author))
 
     if category:
-        query = query.join(Category).filter(Category.name == category)
+        category = parse_query_params(request.args, key='category')
+        query = query.join(Category).filter(Category.name.in_(category))
 
     if 'author' in parse_query_params(request.args, key='expand'):
         query = query.options(joinedload(Exercise.author))
 
-    if order_by == 'avg_rating':
+    if order_by == 'average_rating':
         query = query.order_by(nullslast(orderfunc(Exercise.avg_rating)))
+    elif order_by == 'average_fun_rating':
+        query = query.order_by(nullslast(orderfunc(Exercise.avg_fun_rating)))
+    elif order_by == 'average_clear_rating':
+        query = query.order_by(nullslast(orderfunc(Exercise.avg_clear_rating)))
+    elif order_by == 'average_effective_rating':
+        query = query.order_by(nullslast(orderfunc(Exercise.avg_effective_rating)))
     elif order_by == 'popularity':
         query = query.order_by(nullslast(orderfunc(Exercise.popularity)))
     elif order_by == 'updated_at':
         query = query.order_by(orderfunc(Exercise.updated_at))
-    elif order_by == 'search':
-        query = query.order_by(nullslast(orderfunc('search_rank')))
     else:
         query = query.order_by(orderfunc(Exercise.created_at))
 
@@ -154,9 +163,27 @@ def add_to_favorites(id):
 
 
 @v1.route('/exercises/<hashid:id>', methods=['GET'])
+@auth.token_optional
 def get_exercise(id):
     '''Get an exercise.'''
-    exercise = get_or_404(Exercise, id)
+    query = Exercise.query.filter(Exercise.id == id)
+
+    if auth.current_user:
+        result = query.add_entity(Rating).\
+            join(Rating).\
+            filter(Rating.user_id == auth.current_user.id).\
+            first()
+
+        try:
+            exercise = setattr_and_return(result[0], 'user_rating', result[1])
+        except TypeError:
+            exercise = None
+    else:
+        exercise = query.first()
+
+    if not exercise:
+        abort(404)
+
     serializer = Serializer(ExerciseSchema, request.args)
     return serializer.dump(exercise)
 

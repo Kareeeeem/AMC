@@ -87,7 +87,7 @@ def pg_make_obscure_id(element, compiler, **kwargs):
 class BcryptStr(str):
     '''Subclass of string that encrypts and compares using Bcrypt.
     '''
-    def __new__(cls, value, salt=None, crypt=True, rounds=12):
+    def __new__(cls, value, salt=None, crypt=True, rounds=13):
         if isinstance(value, unicode):
             value = value.encode('utf-8')
         if crypt:
