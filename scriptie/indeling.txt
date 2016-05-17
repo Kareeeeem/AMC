@@ -1,0 +1,9 @@
+vooronderzoek
+proces (details)
+    db
+    server
+    frontend
+eindproduct (grote lijnen)
+validatie
+conclusie
+aanbevelingen
