@@ -60,9 +60,7 @@ and `page` query parameters.
 {
     "current": "/v1/exercises?per_page=10&page=1",
     "first": "/v1/exercises?per_page=10&page=1",
-    "items": [
-        ...
-    ],
+    "items": [...],
     "last": "/v1/exercises?per_page=10&page=51",
     "next": "/v1/exercises?per_page=10&page=2",
     "page": 1,
@@ -93,7 +91,7 @@ grant flow. The steps are as follows.
     Content-Length: 209
     Content-Type: application/json
     Date: Sat, 21 May 2016 15:00:21 GMT
-    Location: http://localhost:5000/v1/users/8n5YvV
+    Location: /v1/users/8n5YvV
     Server: Werkzeug/0.11.5 Python/2.7.11+
 
     {
@@ -124,168 +122,169 @@ grant flow. The steps are as follows.
     Date: Sat, 21 May 2016 19:02:25 GMT
     Server: Werkzeug/0.11.5 Python/2.7.11+
 
-    {
-        "current": "/v1/users?per_page=10&page=1",
-        "first": "/v1/users?per_page=10&page=1",
-        "items": [
-            {
-                "data": {
-                    "username": "user0"
-                },
-                "meta": {
-                    "href": "/v1/users/1K2AlRM",
-                    "id": "1K2AlRM"
-                },
-                "related": {
-                    "authored_exercises": "/v1/exercises?author=user0",
-                    "favorite_exercises": "/v1/users/1K2AlRM/favorites"
-                }
+{
+    "current": "/v1/users?per_page=10&page=1",
+    "first": "/v1/users?per_page=10&page=1",
+    "items": [
+        {
+            "data": {
+                "username": "user0"
             },
-            {
-                "data": {
-                    "username": "user1"
-                },
-                "meta": {
-                    "href": "/v1/users/zPy9014",
-                    "id": "zPy9014"
-                },
-                "related": {
-                    "authored_exercises": "/v1/exercises?author=user1",
-                    "favorite_exercises": "/v1/users/zPy9014/favorites"
-                }
+            "meta": {
+                "href": "/v1/users/1K2AlRM",
+                "id": "1K2AlRM"
             },
-            ...
-            {
-                "data": {
-                    "username": "user9"
-                },
-                "meta": {
-                    "href": "/v1/users/eqnP24",
-                    "id": "eqnP24"
-                },
-                "related": {
-                    "authored_exercises": "/v1/exercises?author=user9",
-                    "favorite_exercises": "/v1/users/eqnP24/favorites"
-                }
+            "related": {
+                "authored_exercises": "/v1/exercises?author=user0",
+                "favorite_exercises": "/v1/users/1K2AlRM/favorites"
             }
-        ],
-        "last": "/v1/users?per_page=10&page=1",
-        "next": null,
-        "page": 1,
-        "pages": 1,
-        "per_page": 10,
-        "prev": null,
-        "total": 10
-    }
+        },
+        {
+            "data": {
+                "username": "user1"
+            },
+            "meta": {
+                "href": "/v1/users/zPy9014",
+                "id": "zPy9014"
+            },
+            "related": {
+                "authored_exercises": "/v1/exercises?author=user1",
+                "favorite_exercises": "/v1/users/zPy9014/favorites"
+            }
+        },
+        {
+            "data": {
+                "username": "user9"
+            },
+            "meta": {
+                "href": "/v1/users/eqnP24",
+                "id": "eqnP24"
+            },
+            "related": {
+                "authored_exercises": "/v1/exercises?author=user9",
+                "favorite_exercises": "/v1/users/eqnP24/favorites"
+            }
+        }
+    ],
+    "last": "/v1/users?per_page=10&page=1",
+    "next": null,
+    "page": 1,
+    "pages": 1,
+    "per_page": 10,
+    "prev": null,
+    "total": 10
+}
     ```
 
 * example `POST` request
 
 
-    ```
-    {
-        "username": "kareem",
-        "password": "1234hoedjevanpapier"
-    }
-    ```
+```
+{
+    "password": "1234hoedjevanpapier",
+    "username": "kareem"
+}
+```
 
 * example `POST` response
 
-    ```
-    HTTP/1.0 201 CREATED
-    Content-Length: 466
-    Content-Type: application/json
-    Date: Sat, 21 May 2016 15:12:35 GMT
-    Location: /v1/users/OXy00BO
-    Server: Werkzeug/0.11.5 Python/2.7.11+
+```
+HTTP/1.0 201 CREATED
+Content-Length: 466
+Content-Type: application/json
+Date: Sat, 21 May 2016 15:12:35 GMT
+Location: /v1/users/OXy00BO
+Server: Werkzeug/0.11.5 Python/2.7.11+
 
-    {
-        "data": {
-            "email": null,
-            "username": "kareem"
-        },
-        "meta": {
-            "created_at": "2016-05-21T15:12:35.256880+00:00",
-            "href": "/v1/users/OXy00BO",
-            "id": "OXy00BO",
-            "last_login": null,
-            "updated_at": "2016-05-21T15:12:35.256896+00:00"
-        },
-        "related": {
-            "authored_exercises": "/v1/exercises?author=blah",
-            "favorite_exercises": "/v1/users/OXy00BO/favorites"
-        }
+{
+    "data": {
+        "email": null,
+        "username": "kareem"
+    },
+    "meta": {
+        "created_at": "2016-05-21T15:12:35.256880+00:00",
+        "href": "/v1/users/OXy00BO",
+        "id": "OXy00BO",
+        "last_login": null,
+        "updated_at": "2016-05-21T15:12:35.256896+00:00"
+    },
+    "related": {
+        "authored_exercises": "/v1/exercises?author=blah",
+        "favorite_exercises": "/v1/users/OXy00BO/favorites"
     }
-    ```
+}
+```
 
 ### `/v1/users/<id>`
 * methods: GET, PUT, DELETE
 * example PUT request
 
-    ```
-        {
-            "username": "lowercasekareem",
-            "email": "kareem@blah.com"
-        }
-    ```
+```
+{
+    "email": "kareem@blah.com",
+    "username": "lowercasekareem"
+}
+```
+
 * example PUT response
 
-    ```
-    {
-        "data": {
-            "email": "kareem@blah.com",
-            "username": "lowercasekareem"
-        },
-        "meta": {
-            "created_at": "2016-05-21T15:12:35.256880+00:00",
-            "href": "/v1/users/OXy00BO",
-            "id": "OXy00BO",
-            "last_login": "2016-05-23T16:30:35.25640+00:00",
-            "updated_at": "2016-05-21T15:12:35.256896+00:00"
-        },
-        "related": {
-            "authored_exercises": "/v1/exercises?author=blah",
-            "favorite_exercises": "/v1/users/OXy00BO/favorites"
-        }
+```
+{
+    "data": {
+        "email": "kareem@blah.com",
+        "username": "lowercasekareem"
+    },
+    "meta": {
+        "created_at": "2016-05-21T15:12:35.256880+00:00",
+        "href": "/v1/users/OXy00BO",
+        "id": "OXy00BO",
+        "last_login": "2016-05-23T16:30:35.25640+00:00",
+        "updated_at": "2016-05-21T15:12:35.256896+00:00"
+    },
+    "related": {
+        "authored_exercises": "/v1/exercises?author=blah",
+        "favorite_exercises": "/v1/users/OXy00BO/favorites"
     }
-    ```
+}
+```
+
 * example GET response (without token)
 
-    ```
-    {
-        "data": {
-            "username": "lowercasekareem"
-        },
-        "meta": {
-            "href": "/v1/users/OXy00BO",
-            "id": "OXy00BO",
-        },
-        "related": {
-            "authored_exercises": "/v1/exercises?author=blah",
-            "favorite_exercises": "/v1/users/OXy00BO/favorites"
-        }
+```
+{
+    "data": {
+        "username": "lowercasekareem"
     },
-    ```
+    "meta": {
+        "href": "/v1/users/OXy00BO",
+        "id": "OXy00BO"
+    },
+    "related": {
+        "authored_exercises": "/v1/exercises?author=blah",
+        "favorite_exercises": "/v1/users/OXy00BO/favorites"
+    }
+}
+```
 
 * example GET response (with token)
 
-    ```
-    {
-        "data": {
-            "username": "lowercasekareem"
-        },
-        "meta": {
-            "created_at": "2016-05-21T15:12:35.256880+00:00",
-            "href": "/v1/users/OXy00BO",
-            "id": "OXy00BO",
-            "last_login": "2016-05-23T16:30:35.25640+00:00",
-            "updated_at": "2016-05-21T15:12:35.256896+00:00"
-        },
-        "related": {
-            "authored_exercises": "/v1/exercises?author=blah",
-            "favorite_exercises": "/v1/users/OXy00BO/favorites"
-        }
+```
+{
+    "data": {
+        "username": "lowercasekareem"
     },
+    "meta": {
+        "created_at": "2016-05-21T15:12:35.256880+00:00",
+        "href": "/v1/users/OXy00BO",
+        "id": "OXy00BO",
+        "last_login": "2016-05-23T16:30:35.25640+00:00",
+        "updated_at": "2016-05-21T15:12:35.256896+00:00"
+    },
+    "related": {
+        "authored_exercises": "/v1/exercises?author=blah",
+        "favorite_exercises": "/v1/users/OXy00BO/favorites"
+    }
+}
     ```
 
 ## Exercise endpoints
@@ -309,142 +308,142 @@ grant flow. The steps are as follows.
 
 * example POST request
 
-    ```
-    {
-        "title": "new exercise",
-        "description": "new description man",
-        "category": "relaxatie",
-        "duration": {"min": 0, "max": 5"}
-    }
-    ```
+```
+{
+    "title": "new exercise",
+    "description": "new description man",
+    "category": "relaxatie",
+    "duration": {"min": 0, "max": 5"}
+}
+```
 
 * example POST response
 
-    ```
-    HTTP/1.0 201 CREATED
-    Content-Length: 806
-    Content-Type: application/json
-    Date: Sat, 21 May 2016 16:25:47 GMT
-    Location: http://localhost:5000/v1/exercises/go5yOQz
-    Server: Werkzeug/0.11.5 Python/2.7.11+
+```
+HTTP/1.0 201 CREATED
+Content-Length: 806
+Content-Type: application/json
+Date: Sat, 21 May 2016 16:25:47 GMT
+Location: /v1/exercises/go5yOQz
+Server: Werkzeug/0.11.5 Python/2.7.11+
 
 {
     "data": {
-	"category": "relaxatie",
-	"description": "new description man",
-	"difficulty": 0,
-	"duration": {
-	    "max": 5,
-	    "min": 0
-	},
-	"group_exercise": false,
-	"json": {},
-	"private_exercise": false,
-	"title": "new exercise"
+        "category": "relaxatie",
+        "description": "new description man",
+        "difficulty": 0,
+        "duration": {
+            "max": 5,
+            "min": 0
+        },
+        "group_exercise": false,
+        "json": {},
+        "private_exercise": false,
+        "title": "new exercise"
     },
     "meta": {
-	"average_rating": {
-	    "clear": null,
-	    "effective": null,
-	    "fun": null,
-	    "rating": null
-	},
-	"created_at": "2016-05-21T16:25:47.115088+00:00",
-	"edit_allowed": true,
-	"href": "http://localhost:5000/v1/exercises/go5yOQz",
-	"id": "go5yOQz",
-	"popularity": 2.8,
-	"updated_at": "2016-05-21T16:25:47.115103+00:00"
+        "average_rating": {
+            "clear": null,
+            "effective": null,
+            "fun": null,
+            "rating": null
+        },
+        "created_at": "2016-05-21T16:25:47.115088+00:00",
+        "edit_allowed": true,
+        "href": "/v1/exercises/go5yOQz",
+        "id": "go5yOQz",
+        "popularity": 2.8,
+        "updated_at": "2016-05-21T16:25:47.115103+00:00"
     },
     "related": {
-	"author": "http://localhost:5000/v1/users/zPy9014",
-	"rating": "http://localhost:5000/v1/exercises/go5yOQz/ratings"
+        "author": "/v1/users/zPy9014",
+        "rating": "/v1/exercises/go5yOQz/ratings"
     }
 }
-    ```
+```
 
 * example GET response
 
 ```
-    HTTP/1.0 200 OK
-    Content-Length: 2305
-    Content-Type: application/json
-    Date: Sat, 21 May 2016 16:30:47 GMT
-    Server: Werkzeug/0.11.5 Python/2.7.11+
+HTTP/1.0 200 OK
+Content-Length: 2305
+Content-Type: application/json
+Date: Sat, 21 May 2016 16:30:47 GMT
+Server: Werkzeug/0.11.5 Python/2.7.11+
 
 {
-    "current": "http://localhost:5000/v1/exercises?per_page=2&order_by=average_rating&page=1",
-    "first": "http://localhost:5000/v1/exercises?per_page=2&order_by=average_rating&page=1",
+    "current": "/v1/exercises?per_page=2&order_by=average_rating&page=1",
+    "first": "/v1/exercises?per_page=2&order_by=average_rating&page=1",
     "items": [
-	{
-	    "data": {
-		"category": "overig",
-		"description": "desc41",
-		"difficulty": 0,
-		"duration": {
-		    "max": 15,
-		    "min": 5
-		},
-		"group_exercise": false,
-		"json": null,
-		"private_exercise": false,
-		"title": "title41"
-	    },
-	    "meta": {
-		"average_rating": {
-		    "clear": 5,
-		    "effective": 4,
-		    "fun": 4,
-		    "rating": 4.33333333333333
-		},
-		"created_at": "2016-05-21T16:21:10.778219+00:00",
-		"edit_allowed": true,
-		"href": "http://localhost:5000/v1/exercises/O5W9wmK",
-		"id": "O5W9wmK",
-		"popularity": 3.0,
-		"updated_at": "2016-05-21T16:21:10.778240+00:00"
-	    },
-	    "related": {
-		"author": "http://localhost:5000/v1/users/kRr89bn",
-		"rating": "http://localhost:5000/v1/exercises/O5W9wmK/ratings"
-	    }
-	},
-	{
-	"data": {
-	    "category": "relaxatie",
-	    "description": "desc26",
-	    "difficulty": 0,
-	    "duration": {
-		"max": 5,
-		"min": 0
-	    },
-	    "group_exercise": false,
-	    "json": null,
-	    "private_exercise": false,
-	    "title": "title26"
-	},
-	"meta": {
-	    "average_rating": {
-		"clear": 2,
-		"effective": 5,
-		"fun": 5,
-		"rating": 4.0
-	    },
-	    "created_at": "2016-05-21T16:21:10.733443+00:00",
-	    "edit_allowed": true,
-	    "href": "http://localhost:5000/v1/exercises/Pn9qMyL",
-	    "id": "Pn9qMyL",
-	    "popularity": 3.0,
-	    "updated_at": "2016-05-21T16:21:10.733463+00:00"
-	},
-	"related": {
-	    "author": "http://localhost:5000/v1/users/kR8WW2V",
-	    "rating": "http://localhost:5000/v1/exercises/Pn9qMyL/ratings"
-	}
-	}
+        {
+            "data": {
+                "category": "overig",
+                "description": "desc41",
+                "difficulty": 0,
+                "duration": {
+                    "max": 15,
+                    "min": 5
+                },
+                "group_exercise": false,
+                "json": null,
+                "private_exercise": false,
+                "title": "title41"
+            },
+            "meta": {
+                "average_rating": {
+                    "clear": 5,
+                    "effective": 4,
+                    "fun": 4,
+                    "rating": 4.33333333333333
+                },
+                "created_at": "2016-05-21T16:21:10.778219+00:00",
+                "edit_allowed": true,
+                "href": "/v1/exercises/O5W9wmK",
+                "id": "O5W9wmK",
+                "popularity": 3.0,
+                "updated_at": "2016-05-21T16:21:10.778240+00:00"
+            },
+            "related": {
+                "author": "/v1/users/kRr89bn",
+                "rating": "/v1/exercises/O5W9wmK/ratings"
+            }
+        },
+        {
+            "data": {
+                "category": "relaxatie",
+                "description": "desc26",
+                "difficulty": 0,
+                "duration": {
+                    "max": 5,
+                    "min": 0
+                },
+                "group_exercise": false,
+                "json": null,
+                "private_exercise": false,
+                "title": "title26"
+            },
+            "meta": {
+                "average_rating": {
+                    "clear": 2,
+                    "effective": 5,
+                    "fun": 5,
+                    "rating": 4.0
+                },
+                "created_at": "2016-05-21T16:21:10.733443+00:00",
+                "edit_allowed": true,
+                "href": "/v1/exercises/Pn9qMyL",
+                "id": "Pn9qMyL",
+                "popularity": 3.0,
+                "updated_at": "2016-05-21T16:21:10.733463+00:00"
+            },
+            "related": {
+                "author": "/v1/users/kR8WW2V",
+                "rating": "/v1/exercises/Pn9qMyL/ratings"
+            }
+        }
     ],
-    "last": "http://localhost:5000/v1/exercises?per_page=2&order_by=average_rating&page=51",
-    "next": "http://localhost:5000/v1/exercises?per_page=2&order_by=average_rating&page=2",
+    "last": "/v1/exercises?per_page=2&order_by=average_rating&page=51",
+    "next": "/v1/exercises?per_page=2&order_by=average_rating&page=2",
     "page": 1,
     "pages": 51,
     "per_page": 2,
@@ -458,14 +457,17 @@ grant flow. The steps are as follows.
 * Token required for PUT, DELETE
 * example PUT request
 
-    ```
-    {
-        "title": "new exercise",
-        "description": "new description man",
-        "category": "relaxatie",
-        "duration": {"min": 10, "max": 50"}
-    }
-    ```
+```
+{
+    "category": "relaxatie",
+    "description": "new description man",
+    "duration": {
+        "max": 50,
+        "min": 10
+    },
+    "title": "new exercise"
+}
+```
 
 * example PUT response
 
@@ -474,40 +476,40 @@ HTTP/1.0 200 OK
 Content-Length: 806
 Content-Type: application/json
 Date: Sat, 21 May 2016 16:25:47 GMT
-Location: http://localhost:5000/v1/exercises/go5yOQz
+Location: /v1/exercises/go5yOQz
 Server: Werkzeug/0.11.5 Python/2.7.11+
 
 {
     "data": {
-	"category": "relaxatie",
-	"description": "new description man",
-	"difficulty": 0,
-	"duration": {
-	    "max": 10,
-	    "min": 50
-	},
-	"group_exercise": false,
-	"json": {},
-	"private_exercise": false,
-	"title": "new exercise"
+        "category": "relaxatie",
+        "description": "new description man",
+        "difficulty": 0,
+        "duration": {
+            "max": 10,
+            "min": 50
+        },
+        "group_exercise": false,
+        "json": {},
+        "private_exercise": false,
+        "title": "new exercise"
     },
     "meta": {
-	"average_rating": {
-	    "clear": null,
-	    "effective": null,
-	    "fun": null,
-	    "rating": null
-	},
-	"created_at": "2016-05-21T16:25:47.115088+00:00",
-	"edit_allowed": true,
-	"href": "http://localhost:5000/v1/exercises/go5yOQz",
-	"id": "go5yOQz",
-	"popularity": 2.8,
-	"updated_at": "2016-05-21T16:25:47.115103+00:00"
+        "average_rating": {
+            "clear": null,
+            "effective": null,
+            "fun": null,
+            "rating": null
+        },
+        "created_at": "2016-05-21T16:25:47.115088+00:00",
+        "edit_allowed": true,
+        "href": "/v1/exercises/go5yOQz",
+        "id": "go5yOQz",
+        "popularity": 2.8,
+        "updated_at": "2016-05-21T16:25:47.115103+00:00"
     },
     "related": {
-	"author": "http://localhost:5000/v1/users/zPy9014",
-	"rating": "http://localhost:5000/v1/exercises/go5yOQz/ratings"
+        "author": "/v1/users/zPy9014",
+        "rating": "/v1/exercises/go5yOQz/ratings"
     }
 }
 ```
@@ -518,40 +520,40 @@ HTTP/1.0 200 OK
 Content-Length: 806
 Content-Type: application/json
 Date: Sat, 21 May 2016 16:25:47 GMT
-Location: http://localhost:5000/v1/exercises/go5yOQz
+Location: /v1/exercises/go5yOQz
 Server: Werkzeug/0.11.5 Python/2.7.11+
 
 {
     "data": {
-	"category": "relaxatie",
-	"description": "new description man",
-	"difficulty": 0,
-	"duration": {
-	    "max": 10,
-	    "min": 50
-	},
-	"group_exercise": false,
-	"json": {},
-	"private_exercise": false,
-	"title": "new exercise"
+        "category": "relaxatie",
+        "description": "new description man",
+        "difficulty": 0,
+        "duration": {
+            "max": 10,
+            "min": 50
+        },
+        "group_exercise": false,
+        "json": {},
+        "private_exercise": false,
+        "title": "new exercise"
     },
     "meta": {
-	"average_rating": {
-	    "clear": null,
-	    "effective": null,
-	    "fun": null,
-	    "rating": null
-	},
-	"created_at": "2016-05-21T16:25:47.115088+00:00",
-	"edit_allowed": true,
-	"href": "http://localhost:5000/v1/exercises/go5yOQz",
-	"id": "go5yOQz",
-	"popularity": 2.8,
-	"updated_at": "2016-05-21T16:25:47.115103+00:00"
+        "average_rating": {
+            "clear": null,
+            "effective": null,
+            "fun": null,
+            "rating": null
+        },
+        "created_at": "2016-05-21T16:25:47.115088+00:00",
+        "edit_allowed": true,
+        "href": "/v1/exercises/go5yOQz",
+        "id": "go5yOQz",
+        "popularity": 2.8,
+        "updated_at": "2016-05-21T16:25:47.115103+00:00"
     },
     "related": {
-	"author": "http://localhost:5000/v1/users/zPy9014",
-	"rating": "http://localhost:5000/v1/exercises/go5yOQz/ratings"
+        "author": "/v1/users/zPy9014",
+        "rating": "/v1/exercises/go5yOQz/ratings"
     }
 }
 ```
@@ -570,8 +572,8 @@ Date: Sat, 21 May 2016 19:30:05 GMT
 Server: Werkzeug/0.11.5 Python/2.7.11+
 
 {
-    "current": "http://localhost:5000/v1/users/zPy9014/favorites?per_page=10&page=1",
-    "first": "http://localhost:5000/v1/users/zPy9014/favorites?per_page=10&page=1",
+    "current": "/v1/users/zPy9014/favorites?per_page=10&page=1",
+    "first": "/v1/users/zPy9014/favorites?per_page=10&page=1",
     "items": [
         {
             "data": {
@@ -597,19 +599,19 @@ Server: Werkzeug/0.11.5 Python/2.7.11+
                 "created_at": "2016-05-21T16:21:10.733443+00:00",
                 "edit_allowed": false,
                 "favorited": true,
-                "href": "http://localhost:5000/v1/exercises/Pn9qMyL",
+                "href": "/v1/exercises/Pn9qMyL",
                 "id": "Pn9qMyL",
                 "popularity": 3.0,
                 "updated_at": "2016-05-21T16:21:10.733463+00:00",
                 "user_rating": null
             },
             "related": {
-                "author": "http://localhost:5000/v1/users/kR8WW2V",
-                "rating": "http://localhost:5000/v1/exercises/Pn9qMyL/ratings"
+                "author": "/v1/users/kR8WW2V",
+                "rating": "/v1/exercises/Pn9qMyL/ratings"
             }
         }
     ],
-    "last": "http://localhost:5000/v1/users/zPy9014/favorites?per_page=10&page=1",
+    "last": "/v1/users/zPy9014/favorites?per_page=10&page=1",
     "next": null,
     "page": 1,
     "pages": 1,
@@ -623,8 +625,8 @@ Server: Werkzeug/0.11.5 Python/2.7.11+
 
 ```
 {
-    "id": "Pn9qMyL",
-     "action": "favorite"
+    "action": "favorite",
+    "id": "Pn9qMyL"
 }
 ```
 
