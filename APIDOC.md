@@ -21,12 +21,24 @@ All `DELETE` requests return an empty body with 204 status code.
 
 All Error messages have the following structure, where `message` could
 be a string or an array of errors.
-
 ```
+HTTP/1.0 400 BAD REQUEST
+Content-Length: 141
+Content-Type: application/json
+Date: Sat, 21 May 2016 15:10:37 GMT
+Server: Werkzeug/0.11.5 Python/2.7.11+
+
 {
     "errors": {
-        "message": "Resource not found",
-        "status_code": 404
+        "message": {
+            "password": [
+                "Missing data for required field."
+            ],
+            "username": [
+                "Missing data for required field."
+            ]
+        },
+        "status_code": 400
     }
 }
 ```
@@ -101,7 +113,6 @@ grant flow. The steps are as follows.
 
 ### `/v1/users`
 * methods: GET, POST
-* Content-Type: application/json
 * example `GET` response
     ```
     HTTP/1.0 200 OK
@@ -113,56 +124,56 @@ grant flow. The steps are as follows.
     {
         "current": "/v1/users?per_page=10&page=1",
         "first": "/v1/users?per_page=10&page=1",
-    "items": [
-        {
-            "data": {
-                "username": "user0"
+        "items": [
+            {
+                "data": {
+                    "username": "user0"
+                },
+                "meta": {
+                    "href": "/v1/users/1K2AlRM",
+                    "id": "1K2AlRM"
+                },
+                "related": {
+                    "authored_exercises": "/v1/exercises?author=user0",
+                    "favorite_exercises": "/v1/users/1K2AlRM/favorites"
+                }
             },
-            "meta": {
-                "href": "/v1/users/1K2AlRM",
-                "id": "1K2AlRM"
+            {
+                "data": {
+                    "username": "user1"
+                },
+                "meta": {
+                    "href": "/v1/users/zPy9014",
+                    "id": "zPy9014"
+                },
+                "related": {
+                    "authored_exercises": "/v1/exercises?author=user1",
+                    "favorite_exercises": "/v1/users/zPy9014/favorites"
+                }
             },
-            "related": {
-                "authored_exercises": "/v1/exercises?author=user0",
-                "favorite_exercises": "/v1/users/1K2AlRM/favorites"
+            ...
+            {
+                "data": {
+                    "username": "user9"
+                },
+                "meta": {
+                    "href": "/v1/users/eqnP24",
+                    "id": "eqnP24"
+                },
+                "related": {
+                    "authored_exercises": "/v1/exercises?author=user9",
+                    "favorite_exercises": "/v1/users/eqnP24/favorites"
+                }
             }
-        },
-        {
-            "data": {
-                "username": "user1"
-            },
-            "meta": {
-                "href": "/v1/users/zPy9014",
-                "id": "zPy9014"
-            },
-            "related": {
-                "authored_exercises": "/v1/exercises?author=user1",
-                "favorite_exercises": "/v1/users/zPy9014/favorites"
-            }
-        },
-        ...
-        {
-            "data": {
-                "username": "user9"
-            },
-            "meta": {
-                "href": "/v1/users/eqnP24",
-                "id": "eqnP24"
-            },
-            "related": {
-                "authored_exercises": "/v1/exercises?author=user9",
-                "favorite_exercises": "/v1/users/eqnP24/favorites"
-            }
-        }
-    ],
-    "last": "/v1/users?per_page=10&page=1",
-    "next": null,
-    "page": 1,
-    "pages": 1,
-    "per_page": 10,
-    "prev": null,
-    "total": 10
-}
+        ],
+        "last": "/v1/users?per_page=10&page=1",
+        "next": null,
+        "page": 1,
+        "pages": 1,
+        "per_page": 10,
+        "prev": null,
+        "total": 10
+    }
     ```
 * example `POST` request
     ```
@@ -177,7 +188,7 @@ grant flow. The steps are as follows.
     Content-Length: 466
     Content-Type: application/json
     Date: Sat, 21 May 2016 15:12:35 GMT
-    Location: http://localhost:5000/v1/users/OXy00BO
+    Location: /v1/users/OXy00BO
     Server: Werkzeug/0.11.5 Python/2.7.11+
 
     {
@@ -198,45 +209,71 @@ grant flow. The steps are as follows.
         }
     }
     ```
-* example error
-    ```
-    HTTP/1.0 400 BAD REQUEST
-    Content-Length: 141
-    Content-Type: application/json
-    Date: Sat, 21 May 2016 15:10:37 GMT
-    Server: Werkzeug/0.11.5 Python/2.7.11+
-
-    {
-	"errors": {
-	    "message": {
-		"password": [
-		    "Missing data for required field."
-		],
-		"username": [
-		    "Missing data for required field."
-		]
-	    },
-	    "status_code": 400
-	}
-    }
-    ```
 
 ### `/v1/users/<id>`
-
 * methods: GET, PUT, DELETE
-* Content-Type: application/json
-* required fields: username
-* available fields: see fields in `data` attribute.
-* example response GET, PUT
-Same as for `v1/users/` POST request.
-* example response DELETE
-```
-HTTP/1.0 204 NO CONTENT
-Content-Length: 0
-Content-Type: application/json
-Date: Sat, 21 May 2016 15:26:38 GMT
-Server: Werkzeug/0.11.5 Python/2.7.11+
-```
+* example PUT request
+    ```
+        {
+            "username": "lowercasekareem",
+            "email": "kareem@blah.com"
+        }
+    ```
+* example PUT response
+    ```
+    {
+        "data": {
+            "email": "kareem@blah.com",
+            "username": "lowercasekareem"
+        },
+        "meta": {
+            "created_at": "2016-05-21T15:12:35.256880+00:00",
+            "href": "/v1/users/OXy00BO",
+            "id": "OXy00BO",
+            "last_login": "2016-05-23T16:30:35.25640+00:00",
+            "updated_at": "2016-05-21T15:12:35.256896+00:00"
+        },
+        "related": {
+            "authored_exercises": "/v1/exercises?author=blah",
+            "favorite_exercises": "/v1/users/OXy00BO/favorites"
+        }
+    }
+    ```
+* example GET response (without token)
+    ```
+    {
+        "data": {
+            "username": "lowercasekareem"
+        },
+        "meta": {
+            "href": "/v1/users/OXy00BO",
+            "id": "OXy00BO",
+        },
+        "related": {
+            "authored_exercises": "/v1/exercises?author=blah",
+            "favorite_exercises": "/v1/users/OXy00BO/favorites"
+        }
+    },
+    ```
+* example GET response (with token)
+    ```
+    {
+        "data": {
+            "username": "lowercasekareem"
+        },
+        "meta": {
+            "created_at": "2016-05-21T15:12:35.256880+00:00",
+            "href": "/v1/users/OXy00BO",
+            "id": "OXy00BO",
+            "last_login": "2016-05-23T16:30:35.25640+00:00",
+            "updated_at": "2016-05-21T15:12:35.256896+00:00"
+        },
+        "related": {
+            "authored_exercises": "/v1/exercises?author=blah",
+            "favorite_exercises": "/v1/users/OXy00BO/favorites"
+        }
+    },
+    ```
 
 ## Exercise endpoints
 
