@@ -176,13 +176,16 @@ grant flow. The steps are as follows.
     }
     ```
 * example `POST` request
+
     ```
     {
         "username": "kareem",
         "password": "1234hoedjevanpapier"
     }
     ```
+
 * example `POST` response
+
     ```
     HTTP/1.0 201 CREATED
     Content-Length: 466
@@ -213,6 +216,7 @@ grant flow. The steps are as follows.
 ### `/v1/users/<id>`
 * methods: GET, PUT, DELETE
 * example PUT request
+
     ```
         {
             "username": "lowercasekareem",
@@ -220,6 +224,7 @@ grant flow. The steps are as follows.
         }
     ```
 * example PUT response
+
     ```
     {
         "data": {
@@ -240,6 +245,7 @@ grant flow. The steps are as follows.
     }
     ```
 * example GET response (without token)
+
     ```
     {
         "data": {
@@ -256,6 +262,7 @@ grant flow. The steps are as follows.
     },
     ```
 * example GET response (with token)
+
     ```
     {
         "data": {
@@ -305,6 +312,7 @@ grant flow. The steps are as follows.
         "duration": {"min": 0, "max": 5"}
     }
     ```
+
 * example POST response
     ```
     HTTP/1.0 201 CREATED
@@ -348,6 +356,7 @@ grant flow. The steps are as follows.
 	}
     }
     ```
+
 * example GET response
 ```
     HTTP/1.0 200 OK
