@@ -1,5 +1,7 @@
 # API Docs
 
+**TODO** document rating and questionnaire endpoints
+
 ## TOC
 
 * [What you need to know](#what-you-need-to-know)
@@ -114,6 +116,7 @@ grant flow. The steps are as follows.
 ### `/v1/users`
 * methods: GET, POST
 * example `GET` response
+
     ```
     HTTP/1.0 200 OK
     Content-Length: 3980
@@ -175,7 +178,9 @@ grant flow. The steps are as follows.
         "total": 10
     }
     ```
+
 * example `POST` request
+
 
     ```
     {
@@ -261,6 +266,7 @@ grant flow. The steps are as follows.
         }
     },
     ```
+
 * example GET response (with token)
 
     ```
@@ -287,8 +293,7 @@ grant flow. The steps are as follows.
 ### `v1/exercises`
 
 * methods: POST, GET
-* Token required (POST)
-* Content-Type: application/json
+* Token required for POST
 * allowed query params (all optional):
     * search (string)
     * category (see category endpoint for available categories)
@@ -302,7 +307,7 @@ grant flow. The steps are as follows.
         * relevance (of search results)
         * popularity
 
-* example POST data
+* example POST request
 
     ```
     {
@@ -314,6 +319,7 @@ grant flow. The steps are as follows.
     ```
 
 * example POST response
+
     ```
     HTTP/1.0 201 CREATED
     Content-Length: 806
@@ -358,6 +364,7 @@ grant flow. The steps are as follows.
     ```
 
 * example GET response
+
 ```
     HTTP/1.0 200 OK
     Content-Length: 2305
@@ -448,20 +455,178 @@ grant flow. The steps are as follows.
 
 ### `v1/exercises/<id>`
 * methods: GET, PUT, DELETE
-* Token required
-* Content-Type: application/json
+* Token required for PUT, DELETE
+* example PUT request
+
+    ```
+    {
+        "title": "new exercise",
+        "description": "new description man",
+        "category": "relaxatie",
+        "duration": {"min": 10, "max": 50"}
+    }
+    ```
+
+* example PUT response
+
+    ```
+    HTTP/1.0 200 OK
+    Content-Length: 806
+    Content-Type: application/json
+    Date: Sat, 21 May 2016 16:25:47 GMT
+    Location: http://localhost:5000/v1/exercises/go5yOQz
+    Server: Werkzeug/0.11.5 Python/2.7.11+
+
+    {
+	"data": {
+	    "category": "relaxatie",
+	    "description": "new description man",
+	    "difficulty": 0,
+	    "duration": {
+		"max": 10,
+		"min": 50
+	    },
+	    "group_exercise": false,
+	    "json": {},
+	    "private_exercise": false,
+	    "title": "new exercise"
+	},
+	"meta": {
+	    "average_rating": {
+		"clear": null,
+		"effective": null,
+		"fun": null,
+		"rating": null
+	    },
+	    "created_at": "2016-05-21T16:25:47.115088+00:00",
+	    "edit_allowed": true,
+	    "href": "http://localhost:5000/v1/exercises/go5yOQz",
+	    "id": "go5yOQz",
+	    "popularity": 2.8,
+	    "updated_at": "2016-05-21T16:25:47.115103+00:00"
+	},
+	"related": {
+	    "author": "http://localhost:5000/v1/users/zPy9014",
+	    "rating": "http://localhost:5000/v1/exercises/go5yOQz/ratings"
+	}
+    }
+    ```
+* example GET response
+
+    ```
+    HTTP/1.0 200 OK
+    Content-Length: 806
+    Content-Type: application/json
+    Date: Sat, 21 May 2016 16:25:47 GMT
+    Location: http://localhost:5000/v1/exercises/go5yOQz
+    Server: Werkzeug/0.11.5 Python/2.7.11+
+
+    {
+	"data": {
+	    "category": "relaxatie",
+	    "description": "new description man",
+	    "difficulty": 0,
+	    "duration": {
+		"max": 10,
+		"min": 50
+	    },
+	    "group_exercise": false,
+	    "json": {},
+	    "private_exercise": false,
+	    "title": "new exercise"
+	},
+	"meta": {
+	    "average_rating": {
+		"clear": null,
+		"effective": null,
+		"fun": null,
+		"rating": null
+	    },
+	    "created_at": "2016-05-21T16:25:47.115088+00:00",
+	    "edit_allowed": true,
+	    "href": "http://localhost:5000/v1/exercises/go5yOQz",
+	    "id": "go5yOQz",
+	    "popularity": 2.8,
+	    "updated_at": "2016-05-21T16:25:47.115103+00:00"
+	},
+	"related": {
+	    "author": "http://localhost:5000/v1/users/zPy9014",
+	    "rating": "http://localhost:5000/v1/exercises/go5yOQz/ratings"
+	}
+    }
+    ```
+
 
 ### `v1/users/<id>/favorites`
 * methods: GET, POST
 * Token required
-* Content-Type: application/json
 * example GET response
-Same as for `/v1/exercises` except that it only returns your favorites.
+
+```
+HTTP/1.0 200 OK
+Content-Length: 1337
+Content-Type: application/json
+Date: Sat, 21 May 2016 19:30:05 GMT
+Server: Werkzeug/0.11.5 Python/2.7.11+
+
+{
+    "current": "http://localhost:5000/v1/users/zPy9014/favorites?per_page=10&page=1",
+    "first": "http://localhost:5000/v1/users/zPy9014/favorites?per_page=10&page=1",
+    "items": [
+        {
+            "data": {
+                "category": "relaxatie",
+                "description": "desc26",
+                "difficulty": 0,
+                "duration": {
+                    "max": 5,
+                    "min": 0
+                },
+                "group_exercise": false,
+                "json": null,
+                "private_exercise": false,
+                "title": "title26"
+            },
+            "meta": {
+                "average_rating": {
+                    "clear": 2,
+                    "effective": 5,
+                    "fun": 5,
+                    "rating": 4.0
+                },
+                "created_at": "2016-05-21T16:21:10.733443+00:00",
+                "edit_allowed": false,
+                "favorited": true,
+                "href": "http://localhost:5000/v1/exercises/Pn9qMyL",
+                "id": "Pn9qMyL",
+                "popularity": 3.0,
+                "updated_at": "2016-05-21T16:21:10.733463+00:00",
+                "user_rating": null
+            },
+            "related": {
+                "author": "http://localhost:5000/v1/users/kR8WW2V",
+                "rating": "http://localhost:5000/v1/exercises/Pn9qMyL/ratings"
+            }
+        }
+    ],
+    "last": "http://localhost:5000/v1/users/zPy9014/favorites?per_page=10&page=1",
+    "next": null,
+    "page": 1,
+    "pages": 1,
+    "per_page": 10,
+    "prev": null,
+    "total": 1
+}
+```
+
 * example POST request
+
     ```
         {"id": "Pn9qMyL", "action": "favorite"}
     ```
-* example response
+
+* example POST response
+
     ```
     HTTP/1.0 204 NO CONTENT
     Content-Length: 0
