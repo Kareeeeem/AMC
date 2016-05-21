@@ -285,7 +285,7 @@ Server: Werkzeug/0.11.5 Python/2.7.11+
         "favorite_exercises": "/v1/users/OXy00BO/favorites"
     }
 }
-    ```
+```
 
 ## Exercise endpoints
 
