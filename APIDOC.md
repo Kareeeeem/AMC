@@ -111,62 +111,65 @@ grant flow. The steps are as follows.
     Server: Werkzeug/0.11.5 Python/2.7.11+
 
     {
-	"current": "/v1/users?per_page=10&page=1",
-	"first": "/v1/users?per_page=10&page=1",
-	"items": [
-	    {
-		"data": {
-		    "username": "user0"
-		},
-		"meta": {
-		    "href": "/v1/users/1K2AlRM",
-		    "id": "1K2AlRM"
-		},
-		"related": {
-		    "authored_exercises": "/v1/exercises?author=user0",
-		    "favorite_exercises": "/v1/users/1K2AlRM/favorites"
-		}
-	    },
-	    ...
-	    {
-		"data": {
-		    "username": "user9"
-		},
-		"meta": {
-		    "href": "/v1/users/eqnP24",
-		    "id": "eqnP24"
-		},
-		"related": {
-		    "authored_exercises": "/v1/exercises?author=user9",
-		    "favorite_exercises": "/v1/users/eqnP24/favorites"
-		}
-	    },
-	    {
-		"data": {
-		    "username": "user1"
-		},
-		"meta": {
-		    "href": "/v1/users/zPy9014",
-		    "id": "zPy9014"
-		},
-		"related": {
-		    "authored_exercises": "/v1/exercises?author=user1",
-		    "favorite_exercises": "/v1/users/zPy9014/favorites"
-		}
-	    }
-	],
-	"last": "/v1/users?per_page=10&page=1",
-	"next": null,
-	"page": 1,
-	"pages": 1,
-	"per_page": 10,
-	"prev": null,
-	"total": 10
-    }
+        "current": "/v1/users?per_page=10&page=1",
+        "first": "/v1/users?per_page=10&page=1",
+    "items": [
+        {
+            "data": {
+                "username": "user0"
+            },
+            "meta": {
+                "href": "/v1/users/1K2AlRM",
+                "id": "1K2AlRM"
+            },
+            "related": {
+                "authored_exercises": "/v1/exercises?author=user0",
+                "favorite_exercises": "/v1/users/1K2AlRM/favorites"
+            }
+        },
+        {
+            "data": {
+                "username": "user1"
+            },
+            "meta": {
+                "href": "/v1/users/zPy9014",
+                "id": "zPy9014"
+            },
+            "related": {
+                "authored_exercises": "/v1/exercises?author=user1",
+                "favorite_exercises": "/v1/users/zPy9014/favorites"
+            }
+        },
+        ...
+        {
+            "data": {
+                "username": "user9"
+            },
+            "meta": {
+                "href": "/v1/users/eqnP24",
+                "id": "eqnP24"
+            },
+            "related": {
+                "authored_exercises": "/v1/exercises?author=user9",
+                "favorite_exercises": "/v1/users/eqnP24/favorites"
+            }
+        }
+    ],
+    "last": "/v1/users?per_page=10&page=1",
+    "next": null,
+    "page": 1,
+    "pages": 1,
+    "per_page": 10,
+    "prev": null,
+    "total": 10
+}
     ```
 * example `POST` request
     ```
-    { "username": "kareem", "password": "1234hoedjevanpapier"
+    {
+        "username": "kareem",
+        "password": "1234hoedjevanpapier"
+    }
     ```
 * example `POST` response
     ```
