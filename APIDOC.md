@@ -178,21 +178,21 @@ grant flow. The steps are as follows.
     Server: Werkzeug/0.11.5 Python/2.7.11+
 
     {
-	"data": {
-	    "email": null,
-	    "username": "kareem"
-	},
-	"meta": {
-	    "created_at": "2016-05-21T15:12:35.256880+00:00",
-	    "href": "/v1/users/OXy00BO",
-	    "id": "OXy00BO",
-	    "last_login": null,
-	    "updated_at": "2016-05-21T15:12:35.256896+00:00"
-	},
-	"related": {
-	    "authored_exercises": "/v1/exercises?author=blah",
-	    "favorite_exercises": "/v1/users/OXy00BO/favorites"
-	}
+        "data": {
+            "email": null,
+            "username": "kareem"
+        },
+        "meta": {
+            "created_at": "2016-05-21T15:12:35.256880+00:00",
+            "href": "/v1/users/OXy00BO",
+            "id": "OXy00BO",
+            "last_login": null,
+            "updated_at": "2016-05-21T15:12:35.256896+00:00"
+        },
+        "related": {
+            "authored_exercises": "/v1/exercises?author=blah",
+            "favorite_exercises": "/v1/users/OXy00BO/favorites"
+        }
     }
     ```
 * example error
