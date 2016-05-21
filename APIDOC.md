@@ -5,17 +5,17 @@
 * [What you need to know](#what-you-need-to-know)
 * [Auth](#auth)
 * [Endpoints](#endpoints)
-    * `v1/users` methods: GET, POST
-    * `v1/users/<user_id>` methods: GET, PUT, DELETE
-    * `v1/users/<user_id>/favorites` methods: GET, POST
-    * `v1/exercises` methods: GET, POST
-    * `v1/exercises/<exercise_id>` methods: GET, PUT, DELETE
-    * `v1/categories` methods: GET
+    * `v1/users` methods: `GET`, `POST`
+    * `v1/users/<user_id>` methods: `GET`, `PUT`, `DELETE`
+    * `v1/users/<user_id>/favorites` methods: `GET`, `POST`
+    * `v1/exercises` methods: `GET`, `POST`
+    * `v1/exercises/<exercise_id>` methods: `GET`, `PUT`, `DELETE`
+    * `v1/categories` methods: `GET`
 
 ## What you need to know
 
 All endpoints receive and send json (`Content-Type: application/json`)
-EXCEPT `/v1/login`. See [Auth](#endpoints) for details.
+**EXCEPT** `/v1/login`. See [Auth](#endpoints) for details.
 
 All `DELETE` requests return an empty body with 204 status code.
 
@@ -44,13 +44,13 @@ and `page` query parameters.
 
 ```
 {
-    "current": "http://localhost:5000/v1/exercises?per_page=10&page=1",
-    "first": "http://localhost:5000/v1/exercises?per_page=10&page=1",
+    "current": "/v1/exercises?per_page=10&page=1",
+    "first": "/v1/exercises?per_page=10&page=1",
     "items": [
         ...
     ],
-    "last": "http://localhost:5000/v1/exercises?per_page=10&page=51",
-    "next": "http://localhost:5000/v1/exercises?per_page=10&page=2",
+    "last": "/v1/exercises?per_page=10&page=51",
+    "next": "/v1/exercises?per_page=10&page=2",
     "page": 1,
     "pages": 11,
     "per_page": 10,
@@ -97,15 +97,79 @@ grant flow. The steps are as follows.
     `Authorization: Bearer eyJhbGciOiJIUzI1NiIsImV4cCI6MTQ2NjQzNDgyMSwiaWF0IjoxNDYzODQyODIxfQ.eyJpZCI6Nzk0MzQxMTd9.QUFhTX0-TV3PZmyzrn2JQyUpPGTdeiFLrSDOtnGe2fU`
 
 
-## User endpoints
+## Endpoints
 
 ### `/v1/users`
-
-* methods: POST
+* methods: GET, POST
 * Content-Type: application/json
-* required fields: username, password
-* example response
-```
+* example `GET` response
+    ```
+    HTTP/1.0 200 OK
+    Content-Length: 3980
+    Content-Type: application/json
+    Date: Sat, 21 May 2016 19:02:25 GMT
+    Server: Werkzeug/0.11.5 Python/2.7.11+
+
+    {
+	"current": "/v1/users?per_page=10&page=1",
+	"first": "/v1/users?per_page=10&page=1",
+	"items": [
+	    {
+		"data": {
+		    "username": "user0"
+		},
+		"meta": {
+		    "href": "/v1/users/1K2AlRM",
+		    "id": "1K2AlRM"
+		},
+		"related": {
+		    "authored_exercises": "/v1/exercises?author=user0",
+		    "favorite_exercises": "/v1/users/1K2AlRM/favorites"
+		}
+	    },
+	    ...
+	    {
+		"data": {
+		    "username": "user9"
+		},
+		"meta": {
+		    "href": "/v1/users/eqnP24",
+		    "id": "eqnP24"
+		},
+		"related": {
+		    "authored_exercises": "/v1/exercises?author=user9",
+		    "favorite_exercises": "/v1/users/eqnP24/favorites"
+		}
+	    },
+	    {
+		"data": {
+		    "username": "user1"
+		},
+		"meta": {
+		    "href": "/v1/users/zPy9014",
+		    "id": "zPy9014"
+		},
+		"related": {
+		    "authored_exercises": "/v1/exercises?author=user1",
+		    "favorite_exercises": "/v1/users/zPy9014/favorites"
+		}
+	    }
+	],
+	"last": "/v1/users?per_page=10&page=1",
+	"next": null,
+	"page": 1,
+	"pages": 1,
+	"per_page": 10,
+	"prev": null,
+	"total": 10
+    }
+    ```
+* example `POST` request
+    ```
+    { "username": "kareem", "password": "1234hoedjevanpapier"
+    ```
+* example `POST` response
+    ```
     HTTP/1.0 201 CREATED
     Content-Length: 466
     Content-Type: application/json
@@ -116,21 +180,21 @@ grant flow. The steps are as follows.
     {
 	"data": {
 	    "email": null,
-	    "username": "blah"
+	    "username": "kareem"
 	},
 	"meta": {
 	    "created_at": "2016-05-21T15:12:35.256880+00:00",
-	    "href": "http://localhost:5000/v1/users/OXy00BO",
+	    "href": "/v1/users/OXy00BO",
 	    "id": "OXy00BO",
 	    "last_login": null,
 	    "updated_at": "2016-05-21T15:12:35.256896+00:00"
 	},
 	"related": {
-	    "authored_exercises": "http://localhost:5000/v1/exercises?author=blah",
-	    "favorite_exercises": "http://localhost:5000/v1/users/OXy00BO/favorites"
+	    "authored_exercises": "/v1/exercises?author=blah",
+	    "favorite_exercises": "/v1/users/OXy00BO/favorites"
 	}
     }
-```
+    ```
 * example error
     ```
     HTTP/1.0 400 BAD REQUEST

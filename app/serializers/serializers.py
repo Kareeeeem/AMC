@@ -136,8 +136,18 @@ class UserSchema(Schema):
     id = HashIDField(dump_only=True)
     username = fields.Str(required=True)
     authored_exercises = fields.Method('get_authored', dump_only=True)
+    favorite_exercises = fields.Method('get_favorites', dump_only=True)
     href = fields.Function(lambda obj: make_url('v1.get_user', id=obj.id),
                            dump_only=True)
+
+    def get_favorites(self, obj):
+        return expandable(obj,
+                          attribute='favorite_exercises',
+                          expand=self.expand,
+                          nested=ExerciseSchema,
+                          route='v1.get_exercises',
+                          route_kwargs={'favorited_by': 'id'},
+                          many=True)
 
     def get_authored(self, obj):
         return expandable(obj,
@@ -151,24 +161,12 @@ class UserSchema(Schema):
     class Meta:
         wrap = True
         meta = 'id', 'href',
-        related = 'authored_exercises',
+        related = 'authored_exercises', 'favorite_exercises',
 
 
 class ProfileSchema(UserSchema):
     email = fields.Email()
     password = fields.Str(required=True, validate=validate.Length(min=8))
-    href = fields.Function(lambda obj: make_url('v1.get_user', id=obj.id),
-                           dump_only=True)
-    favorite_exercises = fields.Method('get_favorites', dump_only=True)
-
-    def get_favorites(self, obj):
-        return expandable(obj,
-                          attribute='favorite_exercises',
-                          expand=self.expand,
-                          nested=ExerciseSchema,
-                          route='v1.get_exercises',
-                          route_kwargs={'favorited_by': 'id'},
-                          many=True)
 
     @validates_schema
     def validate(self, data):
