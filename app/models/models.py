@@ -44,6 +44,8 @@ class User(Base, TokenMixin, CreatedUpdatedMixin, CRUDMixin):
 
     authored_exercises = relationship(
         'Exercise',
+        cascade='all, delete-orphan',
+        passive_deletes=True,
         backref=backref('author'),
     )
 
@@ -189,7 +191,7 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     private_exercise = Column(Boolean, default=False)
     duration = Column(INT4RANGE)
 
-    author_id = Column(ID_TYPE, ForeignKey('user.id'))
+    author_id = Column(ID_TYPE, ForeignKey('user.id', ondelete='CASCADE'))
     category = relationship('Category', backref='exercises', lazy='joined')
     category_id = Column(ID_TYPE, ForeignKey('category.id'))
 
