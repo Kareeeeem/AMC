@@ -554,7 +554,7 @@ Server: Werkzeug/0.11.5 Python/2.7.11+
 	"rating": "http://localhost:5000/v1/exercises/go5yOQz/ratings"
     }
 }
-    ```
+```
 
 
 ### `v1/users/<id>/favorites`
