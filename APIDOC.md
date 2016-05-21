@@ -1,23 +1,63 @@
 # API Docs
 
-For POST and PUT Only the fields contained in the `data` key of a
-resource are valid. All examples only post the required fields.
+## TOC
 
-All PUT methods follow the same pattern as the POST request for the same
-resource.
+* [What you need to know](#what-you-need-to-know)
+* [Auth](#auth)
+* [Endpoints](#endpoints)
+    * `v1/users` methods: GET, POST
+    * `v1/users/<user_id>` methods: GET, PUT, DELETE
+    * `v1/users/<user_id>/favorites` methods: GET, POST
+    * `v1/exercises` methods: GET, POST
+    * `v1/exercises/<exercise_id>` methods: GET, PUT, DELETE
+    * `v1/categories` methods: GET
 
-All DELETE requests return an empty body with 204 status code.
+## What you need to know
+
+All endpoints receive and send json (`Content-Type: application/json`)
+EXCEPT `/v1/login`. See [Auth](#endpoints) for details.
+
+All `DELETE` requests return an empty body with 204 status code.
+
+All Error messages have the following structure, where `message` could
+be a string or an array of errors.
+
+```
+{
+    "errors": {
+        "message": "Resource not found",
+        "status_code": 404
+    }
+}
+```
+
+For `POST` and `PUT` only the fields contained in the `data` key of a
+resource are valid. For the required fields check the example requests.
 
 All `related` attributes are expandable by specifying them in the
-`expand` query parameter. EXCEPT for `rating`
+`expand` query parameter (comma seperated). **EXCEPT** for `rating`
 
 Collection resources return pagination objects containing URI's to
 first, prev, next, current and last pages alongside information about
-number of pages and items. Pagination is customized by
-the `per_page` and `page` query parameters.
+number of pages and items. Pagination is customized with the `per_page`
+and `page` query parameters.
 
-Error messages related to all follow the same format. See `v1/users/`
-POST example.
+```
+{
+    "current": "http://localhost:5000/v1/exercises?per_page=10&page=1",
+    "first": "http://localhost:5000/v1/exercises?per_page=10&page=1",
+    "items": [
+        ...
+    ],
+    "last": "http://localhost:5000/v1/exercises?per_page=10&page=51",
+    "next": "http://localhost:5000/v1/exercises?per_page=10&page=2",
+    "page": 1,
+    "pages": 11,
+    "per_page": 10,
+    "prev": null,
+    "total": 101
+}
+```
 
 ## Auth
 
@@ -55,6 +95,7 @@ grant flow. The steps are as follows.
     user is found.
     Requests are then made by adding the Authorization header.
     `Authorization: Bearer eyJhbGciOiJIUzI1NiIsImV4cCI6MTQ2NjQzNDgyMSwiaWF0IjoxNDYzODQyODIxfQ.eyJpZCI6Nzk0MzQxMTd9.QUFhTX0-TV3PZmyzrn2JQyUpPGTdeiFLrSDOtnGe2fU`
+
 
 ## User endpoints
 
@@ -130,26 +171,6 @@ Date: Sat, 21 May 2016 15:26:38 GMT
 Server: Werkzeug/0.11.5 Python/2.7.11+
 ```
 
-* example error PUT
-    ```
-    HTTP/1.0 400 BAD REQUEST
-    Content-Length: 141
-    Content-Type: application/json
-    Date: Sat, 21 May 2016 15:10:37 GMT
-    Server: Werkzeug/0.11.5 Python/2.7.11+
-
-    {
-	"errors": {
-	    "message": {
-		"username": [
-		    "Missing data for required field."
-		]
-	    },
-	    "status_code": 400
-	}
-    }
-    ```
-
 ## Exercise endpoints
 
 ### `v1/exercises`
@@ -157,7 +178,6 @@ Server: Werkzeug/0.11.5 Python/2.7.11+
 * methods: POST, GET
 * Token required (POST)
 * Content-Type: application/json
-* required fields: title, description, category
 * allowed query params (all optional):
     * search (string)
     * category (see category endpoint for available categories)
