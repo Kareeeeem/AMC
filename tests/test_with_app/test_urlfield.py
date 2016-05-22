@@ -11,7 +11,7 @@ from app.serializers import UserSchema, ExerciseSchema
 def test_nested_field_collapsed(user, exercise, session):
     s = UserSchema()
     rv = s.dump(user).data
-    assert rv['related']['authored_exercises'] == url_for('v1.get_exercises', author_id=user.id)
+    assert rv['related']['authored_exercises'] == url_for('v1.get_exercises', author=user.username)
 
 
 def test_nested_field_expanded(user, exercise, session):

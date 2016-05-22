@@ -278,9 +278,11 @@ class Questionnaire(Base):
     questions = relationship(
         'Question',
         backref='questionnaire',
+        order_by='Question.ordinal',
         collection_class=ordering_list('ordinal'),
         cascade='all, delete-orphan',
         passive_deletes=True,
+        lazy='joined'
     )
     responses = relationship(
         'QuestionnaireResponse',
@@ -300,19 +302,6 @@ class Questionnaire(Base):
         data.update(questions=questions)
         data.update(possible_scores=scores)
         return cls(**data)
-
-    # def __init__(self, **kwargs):
-    #     questions = kwargs.pop('questions')
-    #     self.questions = [Question(**question) for question in questions]
-
-    #     for score in scores:
-    #         range = NumericRange(lower=score['min'],
-    #                              upper=score.get('max', None),
-    #                              bounds='[]')
-    #         self.possible_scores.append(Score(name=score['name'], range=range))
-
-    #     for key, value in kwargs.iteritems():
-    #         setattr(self, key, value)
 
     def __repr__(self):
         return ('Questionnaire(id=%r, title=%r, description=%r, version=%r)' % (
@@ -353,6 +342,7 @@ class Question(Base):
         order_by='Option.value',
         cascade='all, delete-orphan',
         passive_deletes=True,
+        lazy='joined'
     )
     questionnaire_id = Column(
         ID_TYPE,
@@ -466,12 +456,6 @@ where(Choice.response_id == QuestionnaireResponse.id).as_scalar(), Integer)))
         choices = [Choice(**choice) for choice in data.pop('choices')]
         data.update(choices=choices)
         return cls(**data)
-
-    def __init__(self, **kwargs):
-        choices = kwargs.pop('choices')
-        for key, value in kwargs.iteritems():
-            setattr(self, key, value)
-        self.choices = [Choice(**choice) for choice in choices]
 
     def __repr__(self):
         return ('QuestionnaireResponse(user_id=%r, question_id=%r, '

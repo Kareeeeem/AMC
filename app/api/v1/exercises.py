@@ -124,7 +124,7 @@ def get_exercises(favorited_by=None):
     if 'author' in parse_query_params(request.args, key='expand'):
         query = query.options(joinedload(Exercise.author))
 
-    if order_by == 'average_rating':
+    if order_by in ['average_rating', 'rating']:
         query = query.order_by(nullslast(orderfunc(Exercise.avg_rating)))
     elif order_by == 'average_fun_rating':
         query = query.order_by(nullslast(orderfunc(Exercise.avg_fun_rating)))

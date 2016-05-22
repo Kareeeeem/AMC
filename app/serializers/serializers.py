@@ -29,10 +29,10 @@ def expandable(obj, attribute, expand, nested, route, route_kwargs, many=False):
 
 
 class Serializer(object):
-    def __init__(self, schema, query_params=None):
+    def __init__(self, schema, query_params=None, context=None):
         self.schema = schema
         self.query_params = query_params
-        self._context = {}
+        self._context = context or {}
 
     @property
     def context(self):
@@ -214,6 +214,70 @@ class RatingSchema(Schema):
     @validates('effective')
     def validate_effective(self, value):
         return self.validate_rating(value)
+
+
+class OptionSchema(Schema):
+    value = fields.Integer(required=True)
+    text = fields.Str(required=True)
+
+
+class QuestionSchema(Schema):
+    id = HashIDField(dump_only=True)
+    text = fields.Str(required=True)
+    ordinal = fields.Integer(required=True)
+    options = fields.Nested(OptionSchema, many=True)
+
+
+class ScoreSchema(Schema):
+    range = fields.Nested(NumericRangeSchema, required=True)
+    name = fields.Str(required=True)
+
+
+class QuestionnaireSchema(Schema):
+    id = HashIDField(dump_only=True)
+    title = fields.Str(required=True)
+    description = fields.Str(required=True)
+    questions = fields.Nested(QuestionSchema, many=True)
+    possible_scores = fields.Nested(ScoreSchema, many=True)
+    href = fields.Function(lambda obj: make_url('v1.get_questionnaire', id=obj.id),
+                           dump_only=True)
+
+
+class ChoiceSchema(Schema):
+    value = fields.Integer(required=True)
+    question_id = HashIDField(required=True)
+
+
+class QuestionnaireResponseSchema(Schema):
+    choices = fields.Nested(ChoiceSchema, many=True, required=True)
+    questionnaire = fields.Method('get_questionnaire', dump_only=True)
+
+    def get_questionnaire(self, obj):
+        return expandable(obj,
+                          attribute='questionnaire',
+                          expand=self.expand,
+                          nested=QuestionnaireSchema,
+                          route='v1.get_questionnaire',
+                          route_kwargs={'id': 'id'},
+                          )
+    score = fields.Nested(ScoreSchema)
+
+    class Meta:
+        wrap = True
+        dump_only = 'questionnaire', 'score'
+        meta = 'score',
+        related = 'questionnaire',
+
+    @validates('choices')
+    def validate_category(self, value):
+        questionnaire = self.context.get('questionnaire')
+        original_question_ids = [question.id
+                                 for question in questionnaire.questions]
+        given_question_ids = [choice['question_id'] for choice in value]
+        if set(original_question_ids) ^ set(given_question_ids):
+            raise ValidationError('Response is missing questions.')
+
+        # TODO valid values for choices
 
 
 class PaginationSchema(Schema):
