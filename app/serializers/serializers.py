@@ -242,6 +242,10 @@ class QuestionnaireSchema(Schema):
     href = fields.Function(lambda obj: make_url('v1.get_questionnaire', id=obj.id),
                            dump_only=True)
 
+    class Meta:
+        wrap = True
+        meta = 'id', 'href',
+
 
 class ChoiceSchema(Schema):
     value = fields.Integer(required=True)
