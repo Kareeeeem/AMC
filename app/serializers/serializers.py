@@ -244,6 +244,13 @@ class QuestionnaireSchema(Schema):
     href = fields.Function(lambda obj: make_url('v1.get_questionnaire', id=obj.id),
                            dump_only=True)
     responses = fields.Method('get_responses', dump_only=True)
+    max_score = fields.Method('get_max_score', dump_only=True)
+
+    def get_max_score(self, obj):
+        sum = 0
+        for question in obj.questions:
+            sum += max(o.value for o in question.options)
+        return sum
 
     def get_responses(self, obj):
         return expandable(obj,
@@ -258,7 +265,7 @@ class QuestionnaireSchema(Schema):
 
     class Meta:
         wrap = True
-        meta = 'id', 'href',
+        meta = 'id', 'href', 'max_score'
         related = 'responses',
 
 
@@ -270,6 +277,8 @@ class ChoiceSchema(Schema):
 class QuestionnaireResponseSchema(Schema):
     choices = fields.Nested(ChoiceSchema, many=True, required=True)
     questionnaire = fields.Method('get_questionnaire', dump_only=True)
+    total = fields.Function(lambda obj: sum(c.value for c in obj.choices),
+                            dump_only=True)
 
     def get_questionnaire(self, obj):
         return expandable(obj,
@@ -284,7 +293,7 @@ class QuestionnaireResponseSchema(Schema):
     class Meta:
         wrap = True
         dump_only = 'questionnaire', 'score'
-        meta = 'score',
+        meta = 'score', 'total'
         related = 'questionnaire',
 
     @validates('choices')
