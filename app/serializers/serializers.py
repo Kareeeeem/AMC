@@ -1,3 +1,4 @@
+import bleach
 from psycopg2.extras import NumericRange
 from marshmallow import (
     post_load,
@@ -97,6 +98,22 @@ class ExerciseSchema(Schema):
     popularity = fields.Float(dump_only=True)
     user_rating = fields.Nested('RatingSchema', dump_only=True)
     average_rating = fields.Nested('RatingSchema', dump_only=True)
+
+    @post_load
+    def bleach(self, data):
+        allowed_attrs = {
+            'a': ['href', 'rel'],
+            'img': ['src', 'alt']
+        }
+        allowed_tags = ['a', 'img', 'br', 'em', 'strong']
+        description = data.pop('description', '')
+        description = bleach.clean(description,
+                                   tags=allowed_tags,
+                                   attributes=allowed_attrs)
+        print description
+        description = bleach.linkify(description)
+        data['description'] = description
+        return data
 
     @post_load
     def set_category(self, data):
