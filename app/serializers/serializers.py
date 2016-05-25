@@ -15,7 +15,7 @@ from meta import Schema
 from validators import validate_unique
 
 
-def expandable(obj, attribute, expand, nested, route, route_kwargs, many=False):
+def expandable(obj, attribute, expand, nested, route, route_kwargs, **kwargs):
     '''Generate an external url if attribute is not in expand, otherwise
     serialize the expandable attribute.'''
 
@@ -24,7 +24,7 @@ def expandable(obj, attribute, expand, nested, route, route_kwargs, many=False):
                                  in route_kwargs.iteritems()})
         return url
 
-    field = fields.Nested(nested, many=many)
+    field = fields.Nested(nested, **kwargs)
     return field.serialize(attribute, obj)
 
 
@@ -135,10 +135,10 @@ class ExerciseSchema(Schema):
 class UserSchema(Schema):
     id = HashIDField(dump_only=True)
     username = fields.Str(required=True)
-    authored_exercises = fields.Method('get_authored', dump_only=True)
-    favorite_exercises = fields.Method('get_favorites', dump_only=True)
     href = fields.Function(lambda obj: make_url('v1.get_user', id=obj.id),
                            dump_only=True)
+
+    favorite_exercises = fields.Method('get_favorites', dump_only=True)
 
     def get_favorites(self, obj):
         return expandable(obj,
@@ -148,6 +148,8 @@ class UserSchema(Schema):
                           route='v1.get_exercises',
                           route_kwargs={'favorited_by': 'id'},
                           many=True)
+
+    authored_exercises = fields.Method('get_authored', dump_only=True)
 
     def get_authored(self, obj):
         return expandable(obj,
@@ -241,10 +243,23 @@ class QuestionnaireSchema(Schema):
     possible_scores = fields.Nested(ScoreSchema, many=True)
     href = fields.Function(lambda obj: make_url('v1.get_questionnaire', id=obj.id),
                            dump_only=True)
+    responses = fields.Method('get_responses', dump_only=True)
+
+    def get_responses(self, obj):
+        return expandable(obj,
+                          attribute='responses',
+                          expand=self.expand,
+                          nested=QuestionnaireResponseSchema,
+                          route='v1.get_responses',
+                          route_kwargs={'id': 'id'},
+                          many=True,
+                          exclude=['questionnaire']
+                          )
 
     class Meta:
         wrap = True
         meta = 'id', 'href',
+        related = 'responses',
 
 
 class ChoiceSchema(Schema):
@@ -262,7 +277,7 @@ class QuestionnaireResponseSchema(Schema):
                           expand=self.expand,
                           nested=QuestionnaireSchema,
                           route='v1.get_questionnaire',
-                          route_kwargs={'id': 'id'},
+                          route_kwargs={'id': 'questionnaire_id'},
                           )
     score = fields.Nested(ScoreSchema)
 

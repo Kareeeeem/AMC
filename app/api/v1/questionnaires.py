@@ -1,4 +1,6 @@
-from flask import request
+from flask import request, abort
+from sqlalchemy.orm import contains_eager
+from sqlalchemy import and_
 
 from app import auth, db
 from app.models import Questionnaire, QuestionnaireResponse
@@ -22,11 +24,16 @@ from . import v1
 
 
 @v1.route('/questionnaires', methods=['GET'])
-@auth.token_optional
+@auth.token_required
 def get_questionnaires():
     '''Get questionnaires.'''
-    serializer = Serializer(QuestionnaireSchema)
-    query = Questionnaire.query
+    serializer = Serializer(QuestionnaireSchema, request.args)
+    query = Questionnaire.query.\
+        outerjoin(QuestionnaireResponse, and_(
+            QuestionnaireResponse.user_id == auth.current_user.id,
+            QuestionnaireResponse.questionnaire_id == Questionnaire.id
+        )).\
+        options(contains_eager(Questionnaire.responses))
 
     page = Pagination(request, query=query)
     return serializer.dump_page(page)
@@ -36,12 +43,23 @@ def get_questionnaires():
 @auth.token_optional
 def get_questionnaire(id):
     '''Get questionnaire.'''
-    questionnaire = get_or_404(Questionnaire, id)
-    serializer = Serializer(QuestionnaireSchema)
+
+    questionnaire = Questionnaire.query.\
+        outerjoin(QuestionnaireResponse, and_(
+            QuestionnaireResponse.user_id == auth.current_user.id,
+            QuestionnaireResponse.questionnaire_id == Questionnaire.id
+        )).\
+        filter(Questionnaire.id == id).\
+        options(contains_eager(Questionnaire.responses)).first()
+
+    if not questionnaire:
+        abort(404)
+
+    serializer = Serializer(QuestionnaireSchema, request.args)
     return serializer.dump(questionnaire)
 
 
-@v1.route('/questionnaires/<hashid:id>', methods=['POST'])
+@v1.route('/questionnaires/<hashid:id>/responses', methods=['POST'])
 @auth.token_required
 def post_response(id):
     '''Post response.'''
@@ -56,3 +74,15 @@ def post_response(id):
     db.session.add(response)
     db.session.commit()
     return serializer.dump(response)
+
+
+@v1.route('/questionnaires/<hashid:id>/responses', methods=['GET'])
+@auth.token_required
+def get_responses(id):
+    '''Get responses.'''
+    serializer = Serializer(QuestionnaireResponseSchema, request.args)
+    query = QuestionnaireResponse.query.\
+        filter(QuestionnaireResponse.user_id == auth.current_user.id).\
+        order_by(QuestionnaireResponse.created_at.desc())
+    page = Pagination(request, query=query)
+    return serializer.dump_page(page)
