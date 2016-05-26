@@ -47,7 +47,8 @@ BEGIN
             avg_rating=(SELECT avg(rating) FROM rating WHERE exercise_id=old.exercise_id),
             avg_fun_rating=(SELECT avg(fun) FROM rating WHERE exercise_id=old.exercise_id),
             avg_effective_rating=(SELECT avg(effective) FROM rating WHERE exercise_id=old.exercise_id),
-            avg_clear_rating=(SELECT avg(clear) FROM rating WHERE exercise_id=old.exercise_id)
+            avg_clear_rating=(SELECT avg(clear) FROM rating WHERE exercise_id=old.exercise_id),
+            count_ratings=(SELECT count(rating) FROM rating WHERE exercise_id=old.exercise_id)
         WHERE id=old.exercise_id;
         RETURN OLD;
     ELSE
@@ -56,7 +57,8 @@ BEGIN
             avg_rating=(SELECT avg(rating) FROM rating WHERE exercise_id=new.exercise_id),
             avg_fun_rating=(SELECT avg(fun) FROM rating WHERE exercise_id=new.exercise_id),
             avg_effective_rating=(SELECT avg(effective) FROM rating WHERE exercise_id=new.exercise_id),
-            avg_clear_rating=(SELECT avg(clear) FROM rating WHERE exercise_id=new.exercise_id)
+            avg_clear_rating=(SELECT avg(clear) FROM rating WHERE exercise_id=new.exercise_id),
+            count_ratings=(SELECT count(rating) FROM rating WHERE exercise_id=new.exercise_id)
         WHERE id=new.exercise_id;
         RETURN new;
     END IF;

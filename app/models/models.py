@@ -202,6 +202,7 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     avg_fun_rating = Column(Float)
     avg_clear_rating = Column(Float)
     avg_effective_rating = Column(Float)
+    count_ratings = Column(Integer)
 
     @property
     def average_rating(self):
@@ -210,6 +211,7 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
             fun=self.avg_fun_rating,
             clear=self.avg_clear_rating,
             effective=self.avg_effective_rating,
+            count=self.count_ratings,
         )
 
     @property

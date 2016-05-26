@@ -216,6 +216,7 @@ class RatingSchema(Schema):
     fun = fields.Integer(required=True)
     clear = fields.Integer(required=True)
     effective = fields.Integer(required=True)
+    count = fields.Integer()
 
     @staticmethod
     def validate_rating(value):
