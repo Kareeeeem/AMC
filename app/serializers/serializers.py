@@ -1,4 +1,3 @@
-import bleach
 from psycopg2.extras import NumericRange
 from marshmallow import (
     post_load,
@@ -85,6 +84,7 @@ class ExerciseSchema(Schema):
     difficulty = fields.Integer()
     category = fields.Str(attribute='category_name')
     duration = fields.Nested(NumericRangeSchema, required=True)
+    description_html = fields.Str(dump_only=True)
 
     id = HashIDField(dump_only=True)
     favorited = fields.Bool(dump_only=True)
@@ -98,22 +98,6 @@ class ExerciseSchema(Schema):
     popularity = fields.Float(dump_only=True)
     user_rating = fields.Nested('RatingSchema', dump_only=True)
     average_rating = fields.Nested('RatingSchema', dump_only=True)
-
-    @post_load
-    def bleach(self, data):
-        allowed_attrs = {
-            'a': ['href', 'rel'],
-            'img': ['src', 'alt']
-        }
-        allowed_tags = ['a', 'img', 'br', 'em', 'strong']
-        description = data.pop('description', '')
-        description = bleach.clean(description,
-                                   tags=allowed_tags,
-                                   attributes=allowed_attrs)
-        print description
-        description = bleach.linkify(description)
-        data['description'] = description
-        return data
 
     @post_load
     def set_category(self, data):
@@ -143,10 +127,9 @@ class ExerciseSchema(Schema):
         additional = 'created_at', 'updated_at'
         dump_only = 'created_at', 'updated_at'
         related = 'author', 'rating',
-        meta = 'id', 'average_rating', 'user_rating', 'href', 'favorited', \
+        meta = 'id', 'user_rating', 'href', 'favorited', \
             'edit_allowed', 'created_at', 'updated_at', 'popularity', \
-            'avg_fun_rating', 'avg_effective_rating', 'avg_clear_rating', \
-            'avg_rating'
+            'description_html',
 
 
 class UserSchema(Schema):

@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+import markdown
+import bleach
 from psycopg2.extras import NumericRange
 from sqlalchemy import (
     Float,
@@ -190,6 +192,7 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     group_exercise = Column(Boolean, default=False)
     private_exercise = Column(Boolean, default=False)
     duration = Column(INT4RANGE)
+    description_html = Column(Text, nullable=False)  # set by event
 
     author_id = Column(ID_TYPE, ForeignKey('user.id', ondelete='CASCADE'))
     category = relationship('Category', backref='exercises', lazy='joined')
@@ -236,6 +239,13 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
                     self.created_at,
                     self.updated_at,
                 ))
+
+
+@event.listens_for(Exercise.description, 'set')
+def mdtohtml(target, value, oldvalue, initiator):
+    html = markdown.markdown(value)
+    html = bleach.linkify(html)
+    target.description_html = html
 
 
 # This is used for full text search. The application will be in
