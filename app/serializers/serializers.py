@@ -129,7 +129,7 @@ class ExerciseSchema(Schema):
         related = 'author', 'rating',
         meta = 'id', 'user_rating', 'href', 'favorited', \
             'edit_allowed', 'created_at', 'updated_at', 'popularity', \
-            'description_html',
+            'description_html', 'average_rating',
 
 
 class UserSchema(Schema):
