@@ -1,5 +1,11 @@
+import bleach
 from marshmallow import fields, ValidationError
 from app import hashid
+
+
+class SafeStr(fields.Str):
+    def _deserialize(self, value, attr, data):
+        return bleach.clean(value)
 
 
 class HashIDField(fields.Field):
