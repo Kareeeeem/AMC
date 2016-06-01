@@ -5,8 +5,11 @@
 *.egg
 venv/
 env
+env.sh
 dist/
 sdist/
 __pycache__/
 .cache/
 docs/
+*.ini
+wsgi.py

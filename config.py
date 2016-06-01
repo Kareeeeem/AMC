@@ -62,7 +62,6 @@ class DevelopmentConfig(Config):
     HASHID_SALT = 'SaAaAalTy'
     BCRYPT_ROUNDS = 4
     SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URI')
-    SERVER_NAME = 'localhost:5000'
 
 
 class TestingConfig(DevelopmentConfig):
@@ -75,7 +74,7 @@ class ProductionConfig(Config):
     SECRET_KEY = os.environ.get('SECRET_KEY')
     OBSCURE_ID_KEY = os.environ.get('OBSCURE_ID_KEY')
     HASHID_SALT = os.environ.get('HASHID_SALT')
-    SQLALCHEMY_DATABASE_URI = os.environ.get('PROD_DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('PROD_DATABASE_URI')
 
 
 config = {
