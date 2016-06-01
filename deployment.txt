@@ -1,0 +1,33 @@
+Debian 8.3 x64
+
+```
+apt-get update && apt-get upgrade
+apt-get install libffi-dev
+apt-get install build-essential
+apt-get install git
+apt-get install sudo
+apt-get install postgresql-9.4 postgresql-client-9.4 libpq-dev
+apt-get install python-dev
+wget -O - https://bootstrap.pypa.io/get-pip.py | python
+adduser misofome
+```
+
+add this user to the sudo list following this https://www.digitalocean.com/community/tutorials/how-to-add-and-delete-users-on-an-ubuntu-14-04-vps
+
+```
+su - postgres
+createuser misofome
+createdb misofome_prod
+psql -d misofome_prod
+```
+
+we're in the psql shell now
+
+```
+ALTER DATABASE misofome_prod SET default_text_search_config TO 'dutch;'
+ALTER USER misofome WITH password {password};
+GRANT ALL privileges ON DATABASE misofome_prod TO misofome;
+\q
+```
+
+generate ssh keys and place them in the misofome users `.ssh/authorized_keys` folder so we can ssh into that user now

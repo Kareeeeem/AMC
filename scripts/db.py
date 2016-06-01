@@ -33,6 +33,7 @@ def generate_exercises(users, amount=1000):
                                  author=random.choice(users),
                                  category=random.choice(categories),
                                  duration=random.choice(ranges),
+                                 difficulty=random.choice([0, 1, 2]),
                                  ) for i in xrange(amount)]
 
     db_.session.add_all(exercises)
@@ -82,12 +83,12 @@ def create(ctx, d):
 @db.command()
 @click.pass_obj
 def fill(obj):
-    useramount = 10
-    exerciseamount = 100
+    useramount = 5
+    exerciseamount = 25
     users = generate_users(amount=useramount)
     exercises = generate_exercises(users, amount=exerciseamount)
     generate_ratings(users, exercises[:exerciseamount / 2])
-    users[0].favorite_exercises = exercises[:10]
+    users[0].favorite_exercises = exercises[:8]
 
     basedir = os.path.abspath(os.path.dirname(__file__))
     with open(os.path.join(basedir, 'amisos.json')) as amisos_json:

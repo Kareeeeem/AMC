@@ -31,3 +31,10 @@ kopje informatie word
         * ...
 
 test bepaald niveau van patient (begrip van stoornis en behandeling)
+
+
+eerste keer login
+* een stappenplan
+* een advies vanuit de behandeling
+
+
