@@ -1,0 +1,10 @@
+server {
+	listen 80;
+
+	server_name ip_or_name;
+
+	location /v1 {
+		include uwsgi_params;
+		uwsgi_pass unix:/home/misofome/misofome/misofome.sock;
+	}
+}

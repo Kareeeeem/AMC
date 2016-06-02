@@ -1,0 +1,21 @@
+[Unit]
+
+Description=uWSGI instance to serve misofome app
+After=network.target
+
+[Service]
+User=misofome
+Group=www-data
+WorkingDirectory=/home/misofome/misofome
+
+Environment="PROD_DATABASE_URI=postgresql://user:pw@localhost:5432/db"
+Environment="HASHID_SALT=somesalt"
+Environment="OBSCURE_ID_KEY=somekey"
+Environment="SECRET_KEY=somekey"
+
+Environment="PATH=/home/misofome/misofome/venv/bin"
+ExecStart=/home/misofome/misofome/venv/bin/uwsgi --ini misofome.ini
+
+
+[Install]
+WantedBy=multi-user.target

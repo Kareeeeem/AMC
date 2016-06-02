@@ -11,5 +11,4 @@ sdist/
 __pycache__/
 .cache/
 docs/
-*.ini
 wsgi.py
