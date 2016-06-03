@@ -1,7 +1,7 @@
 from flask import request
 
 from app import auth, db
-from app.models import User
+from app.models import User, Exercise
 from app.serializers import (
     ProfileSchema,
     Serializer,
@@ -29,7 +29,10 @@ from . import v1
 def post_users():
     '''Register a user.'''
     serializer = Serializer(ProfileSchema, request.args)
-    user = User.create(db.session, serializer.load(request.get_json()))
+    user = User.create(db.session, serializer.load(request.get_json()), commit=False)
+    default_exercises = Exercise.query.filter(Exercise.default).all()
+    user.favorite_exercises = default_exercises
+    db.session.commit()
     rv = serializer.dump(user)
     return rv, 201, get_location_header('.get_user', id=user.id)
 

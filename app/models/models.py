@@ -194,6 +194,10 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
     duration = Column(INT4RANGE)
     description_html = Column(Text, nullable=False)  # set by event
 
+    # part of the default set of exercises always to be put in favorited by the
+    # application
+    default = Column(Boolean, default=False)
+
     author_id = Column(ID_TYPE, ForeignKey('user.id', ondelete='CASCADE'))
     category = relationship('Category', backref='exercises', lazy='joined')
     category_id = Column(ID_TYPE, ForeignKey('category.id'))

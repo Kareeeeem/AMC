@@ -293,8 +293,9 @@ class QuestionnaireResponseSchema(Schema):
 
     class Meta:
         wrap = True
+        additional = 'created_at', 'updated_at',
         dump_only = 'questionnaire', 'score'
-        meta = 'score', 'total'
+        meta = 'score', 'total', 'created_at', 'updated_at'
         related = 'questionnaire',
 
     @validates('choices')

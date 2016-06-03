@@ -83,6 +83,7 @@ def get_responses(id):
     serializer = Serializer(QuestionnaireResponseSchema, request.args)
     query = QuestionnaireResponse.query.\
         filter(QuestionnaireResponse.user_id == auth.current_user.id).\
+        filter(QuestionnaireResponse.questionnaire_id == id).\
         order_by(QuestionnaireResponse.created_at.desc())
     page = Pagination(request, query=query)
     return serializer.dump_page(page)
