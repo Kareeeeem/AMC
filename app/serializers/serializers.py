@@ -10,7 +10,7 @@ from marshmallow import (
 
 from app import models
 from app.lib import parse_query_params, make_url
-from fields import HashIDField, SafeStr
+from fields import HashIDField
 from meta import Schema
 from validators import validate_unique
 
@@ -76,8 +76,8 @@ class NumericRangeSchema(Schema):
 
 
 class ExerciseSchema(Schema):
-    title = SafeStr(required=True, validate=validate.Length(min=4))
-    description = SafeStr(required=True, validate=validate.Length(min=10))
+    title = fields.Str(required=True, validate=validate.Length(min=4))
+    description = fields.Str(required=True, validate=validate.Length(min=10))
     json = fields.Dict()
     group_exercise = fields.Boolean()
     private_exercise = fields.Boolean()
@@ -134,7 +134,7 @@ class ExerciseSchema(Schema):
 
 class UserSchema(Schema):
     id = HashIDField(dump_only=True)
-    username = SafeStr(required=True)
+    username = fields.Str(required=True, validate=validate.Length(min=1))
     href = fields.Function(lambda obj: make_url('v1.get_user', id=obj.id),
                            dump_only=True)
 
@@ -172,6 +172,7 @@ class ProfileSchema(UserSchema):
 
     @validates_schema
     def validate(self, data):
+        print data
         return validate_unique(self, data, models.User)
 
     class Meta:
@@ -188,7 +189,7 @@ class ActionSchema(Schema):
     FAVORITE = 'favorite'
 
     id = HashIDField(required=True)
-    action = SafeStr(
+    action = fields.Str(
         required=True,
         validate=validate.OneOf([FAVORITE, UNFAVORITE],
                                 error='Must be one of {choices}'))

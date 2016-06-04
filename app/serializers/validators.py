@@ -37,7 +37,7 @@ def validate_unique(schema, data, model):
         errors = {column: '{} is already in use.'.format(column.title())
                   for column in unique_columns
                   for object_ in objects
-                  if getattr(object_, column) == data.get(column)}
+                  if data.get(column) and getattr(object_, column) == data.get(column)}
 
         if errors:
             raise ValidationError(errors, 'conflicts')

@@ -245,11 +245,12 @@ class Exercise(Base, CRUDMixin, CreatedUpdatedMixin):
                 ))
 
 
-@event.listens_for(Exercise.description, 'set')
+@event.listens_for(Exercise.description, 'set', retval=True)
 def mdtohtml(target, value, oldvalue, initiator):
-    html = markdown.markdown(value)
-    html = bleach.linkify(html)
-    target.description_html = html
+    clean_value = bleach.clean(value)
+    html = markdown.markdown(clean_value)
+    target.description_html = bleach.linkify(html)
+    return clean_value
 
 
 # This is used for full text search. The application will be in
