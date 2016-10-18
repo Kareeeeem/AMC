@@ -14,14 +14,6 @@ from app.lib import Pagination, get_or_404
 
 from . import v1
 
-# QUESTIONNAIRE ENDPOINTS
-# ==================
-# /questionnaires                         GET
-# /questionnaires                         POST
-# /questionnaires/<id>                    GET     retrieve a single questionnaire
-# /questionnaires/<id>                    PUT     edit questionnaire
-# /questionnaires/<id>                    DELETE  delete questionnaire
-
 
 @v1.route('/questionnaires', methods=['GET'])
 @auth.token_required

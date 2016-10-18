@@ -22,18 +22,6 @@ from app.lib import (
 
 from . import v1
 
-# EXERCISE ENDPOINTS
-# ==================
-# /exercises                              GET     retrieve all exercises
-# /exercises                              POST    new exercise
-# /exercises/<id>                         GET     retrieve a single exercise
-# /exercises/<id>                         PUT     edit exercise
-# /exercises/<id>                         DELETE  delete exercise
-# /users/<id>/exercises                   GET     retreive all exercises authored by user
-# /users/<id>/favorites                   GET     retreive all exercises favorited by user
-# /users/<id>/favorites                   POST    favorite or unfavorite exercise
-# /exercises/<id>/ratings                 POST    new or update rating
-
 
 @v1.route('/exercises', methods=['POST'])
 @auth.token_required

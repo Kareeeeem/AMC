@@ -16,14 +16,6 @@ from app.lib import (
 
 from . import v1
 
-# USER ENDPOINTS
-# ==============
-# /users                      POST    register with the app
-# /users/<id>                 GET     retrieve a single user
-# /users/<id>                 PUT     edit user
-# /users/<id>                 DELETE  edit user
-# TODO /users/<id>/responses  GET     retreive all responses authored by user
-
 
 @v1.route('/users', methods=['POST'])
 def post_users():
